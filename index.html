@@ -36,9 +36,9 @@
     (function noise(){const d=sctx.createImageData(sc.width,sc.height);const b=new Uint32Array(d.data.buffer);
       for(let i=0;i<b.length;i++)if(Math.random()<0.09)b[i]=0x33ffffff;sctx.putImageData(d,0,0);requestAnimationFrame(noise);})();
 
-    const intro = `welcome back to fransoo.com
+    const intro = `welcome to the fransoo.com finance portal
 
-here's the live bitcoin chart & price`;
+here's the live BTC chart & price`;
     
     const typingEl = document.getElementById('typing');
     const priceBox = document.getElementById('price-box');
@@ -101,60 +101,86 @@ here's the live bitcoin chart & price`;
 
     function drawChart() {
       resizeChart();
-      const w = chartCanvas.width / window.devicePixelRatio;
-      const h = chartCanvas.height / window.devicePixelRatio;
-      ctx.clearRect(0,0,chartCanvas.width,chartCanvas.height);
+      const cw = chartCanvas.width / window.devicePixelRatio; // logical width
+      const ch = chartCanvas.height / window.devicePixelRatio; // logical height
+      ctx.clearRect(0, 0, chartCanvas.width, chartCanvas.height);
 
       const pad = 50;
       const maxP = Math.max(...prices);
       const minP = Math.min(...prices);
       const range = maxP - minP || 1;
+      const numPoints = prices.length;
 
       let step = 0;
       function anim() {
-        ctx.clearRect(0,0,chartCanvas.width,chartCanvas.height);
+        ctx.clearRect(0, 0, chartCanvas.width, chartCanvas.height);
 
-        // Grid lines
+        // Grid lines (horizontal)
         ctx.strokeStyle = '#003340';
         ctx.lineWidth = 1;
-        for(let i=0;i<5;i++){
-          const y = pad + (h-2*pad)/4 * i;
-          ctx.beginPath(); ctx.moveTo(pad * window.devicePixelRatio,y * window.devicePixelRatio); 
-          ctx.lineTo((w-pad) * window.devicePixelRatio,y * window.devicePixelRatio); 
+        for (let i = 0; i <= 4; i++) {
+          const gy = pad + (ch - 2 * pad) * i / 4;
+          ctx.beginPath();
+          ctx.moveTo(pad, gy);
+          ctx.lineTo(cw - pad, gy);
           ctx.stroke();
         }
 
-        // Animate line
-        ctx.strokeStyle = '#00bfff';
-        ctx.lineWidth = 2.5;
-        ctx.beginPath();
-        const pointsToDraw = Math.min(Math.floor(step/3), prices.length - 1);
-        for(let i=0;i<=pointsToDraw;i++){
-          const x = pad + (w-2*pad)/(prices.length-1) * i;
-          const y = h-pad - ((prices[i]-minP)/range)*(h-2*pad);
-          const px = x * window.devicePixelRatio;
-          const py = y * window.devicePixelRatio;
-          i===0 ? ctx.moveTo(px,py) : ctx.lineTo(px,py);
-        }
-        ctx.stroke();
+        // Animate line path
+        const pointsToDraw = Math.min(Math.floor(step / 3), numPoints - 1);
+        if (pointsToDraw >= 0) {
+          const path = [];
+          for (let i = 0; i <= pointsToDraw; i++) {
+            const x = pad + (cw - 2 * pad) * (i / (numPoints - 1));
+            const y = ch - pad - ((prices[i] - minP) / range) * (ch - 2 * pad);
+            path.push({x, y});
+          }
 
-        // Y-axis labels
+          // Draw line
+          ctx.strokeStyle = '#00bfff';
+          ctx.lineWidth = 2.5;
+          ctx.beginPath();
+          ctx.moveTo(path[0].x, path[0].y);
+          for (let i = 1; i < path.length; i++) {
+            ctx.lineTo(path[i].x, path[i].y);
+          }
+          ctx.stroke();
+
+          // Subtle fill under line
+          ctx.fillStyle = 'rgba(0, 191, 255, 0.1)';
+          ctx.beginPath();
+          ctx.moveTo(path[0].x, path[0].y);
+          for (let i = 1; i < path.length; i++) {
+            ctx.lineTo(path[i].x, path[i].y);
+          }
+          ctx.lineTo(path[path.length - 1].x, ch - pad);
+          ctx.lineTo(path[0].x, ch - pad);
+          ctx.closePath();
+          ctx.fill();
+        }
+
+        // Y-axis labels (fixed positioning: top=max, bottom=min)
         ctx.fillStyle = '#00bfff';
-        ctx.font = `${14 * window.devicePixelRatio}px monospace`;
+        ctx.font = '14px monospace';
         ctx.textAlign = 'right';
-        [maxP, (maxP + minP)/2, minP].forEach((p,i)=>{
-          const y = (h - pad - i * (h-2*pad)/2) * window.devicePixelRatio;
-          ctx.fillText(`$${p.toFixed(0)}`, (w-pad+10) * window.devicePixelRatio, y + 4 * window.devicePixelRatio);
+        const yTicks = [maxP, (maxP + minP) / 2, minP];
+        yTicks.forEach((tick, idx) => {
+          const ty = ch - pad - (idx * (ch - 2 * pad) / 2);
+          ctx.fillText(`$${Math.round(tick).toLocaleString()}`, cw - pad - 10, ty + 4);
         });
 
-        // X-axis labels (hours)
+        // X-axis labels (hours ago, reversed for recency)
         ctx.textAlign = 'center';
-        for(let i=0; i<prices.length; i+=Math.floor(prices.length/4)){
-          const x = (pad + (w-2*pad)/(prices.length-1) * i) * window.devicePixelRatio;
-          ctx.fillText(`${i}h`, x, (h - 20) * window.devicePixelRatio);
+        for (let i = 0; i < 5; i++) {
+          const hourIdx = Math.floor((numPoints - 1) * i / 4);
+          const x = pad + (cw - 2 * pad) * (hourIdx / (numPoints - 1));
+          ctx.fillText(`${24 - Math.floor(hourIdx)}h`, x, ch - pad + 18);
         }
 
-        if(step < prices.length*3) {step++; requestAnimationFrame(anim);}
+        if (step < numPoints * 3) {
+          step++;
+          requestAnimationFrame(anim);
+        }
       }
       anim();
     }
