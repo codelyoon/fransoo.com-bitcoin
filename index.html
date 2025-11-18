@@ -3,138 +3,101 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>fransoo.com | BTC Tracker</title>
+  <title>fransoo.com | BTC Live</title>
   <style>
-    body {background:black;color:#00bfff;font-family:'Courier New',monospace;display:flex;flex-direction:column;justify-content:center;align-items:center;height:100vh;margin:0;padding:20px;box-sizing:border-box;position:relative;overflow:hidden}
-    #static-canvas {position:absolute;top:0;left:0;right:0;bottom:0;opacity:1.15;pointer-events:none;z-index:0}
-    .container {max-width:800px;text-align:left;position:relative;z-index:1;width:100%}
-    .typing {white-space:pre-line;font-size:18px}
-    .cursor {display:inline-block;width:2px;background:#00bfff;animation:blink 1s infinite;margin-left:2px}
+    body {background:#000;color:#00bfff;font-family:'Courier New',monospace;margin:0;overflow:hidden;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative}
+    #static-canvas {position:absolute;top:0;left:0;width:100%;height:100%;opacity:0.15;pointer-events:none;z-index:1}
+    .container {z-index:2;text-align:center;max-width:900px;width:100%;padding:20px;box-sizing:border-box}
+    .typing {font-size:20px;white-space:pre-line}
+    .cursor {display:inline-block;width:10px;height:22px;background:#00bfff;animation:blink 1s infinite;vertical-align:middle}
     @keyframes blink {0%,50%{opacity:1}51%,100%{opacity:0}}
-    #chart-container {margin-top:40px;display:none}
-    #btc-chart {border:1px solid #00bfff;width:100%;height:400px;background:black}
-    #current-price {position:absolute;top:20px;right:20px;font-size:24px;opacity:0.8;z-index:2}
-    .price-change {color:#00bfff}
-    .price-up {color:#00ff00}
-    .price-down {color:#ff0000}
+    #price-box {position:absolute;top:20px;right:20px;font-size:28px;font-weight:bold;letter-spacing:1px;z-index:3}
+    .up {color:#00ff00}
+    .down {color:#ff0044}
+    #chart-container {margin-top:50px;width:100%;height:50vh;background:#000;border:1px solid #00bfff;box-sizing:border-box}
+    canvas#chart {width:100%;height:100%}
   </style>
 </head>
 <body>
   <canvas id="static-canvas"></canvas>
-  <div id="current-price">Loading BTC...</div>
+  <div id="price-box">BTC $--.---</div>
   <div class="container">
     <div class="typing" id="typing"></div>
-    <div id="chart-container">
-      <canvas id="btc-chart"></canvas>
-    </div>
+    <div id="chart-container"><canvas id="chart"></canvas></div>
   </div>
 
   <script>
-    // Static noise background
-    const canvas = document.getElementById('static-canvas');
-    const ctx = canvas.getContext('2d');
-    canvas.width = innerWidth;
-    canvas.height = innerHeight;
-    addEventListener('resize', () => {
-      canvas.width = innerWidth;
-      canvas.height = innerHeight;
-    });
-    (function staticNoise() {
-      const imgData = ctx.createImageData(canvas.width, canvas.height);
-      const buffer = new Uint32Array(imgData.data.buffer);
-      for (let i = 0; i < buffer.length; i++) if (Math.random() < 0.09) buffer[i] = 0x44ffffff;
-      ctx.putImageData(imgData, 0, 0);
-      requestAnimationFrame(staticNoise);
-    })();
+    // Static noise
+    const sc = document.getElementById('static-canvas');
+    const sctx = sc.getContext('2d');
+    sc.width = innerWidth; sc.height = innerHeight;
+    window.addEventListener('resize',()=>{sc.width=innerWidth;sc.height=innerHeight});
+    (function noise(){const d=sctx.createImageData(sc.width,sc.height);const b=new Uint32Array(d.data.buffer);
+      for(let i=0;i<b.length;i++)if(Math.random()<0.09)b[i]=0x33ffffff;sctx.putImageData(d,0,0);requestAnimationFrame(noise);})();
 
-    const introText = `hi, i'm Henry Fransoo,
+    const intro = `hi, i'm Henry Fransoo
 
-tracking BTC live - last 24h chart drawing in real time
-
+live BTC 24h chart drawing right now
 fransoo.com`;
+    
+    const typingEl = document.getElementById('typing');
+    const priceBox = document.getElementById('price-box');
+    const chartCanvas = document.getElementById('chart');
+    const ctx = chartCanvas.getContext('2d');
 
-    const typing = document.getElementById('typing');
-    const chartContainer = document.getElementById('chart-container');
-    const currentPriceEl = document.getElementById('current-price');
-    const chartCanvas = document.getElementById('btc-chart');
-    const chartCtx = chartCanvas.getContext('2d');
-
-    function typeWriter(text, el, cb) {
-      let i = 0;
-      const t = setInterval(() => {
-        if (i < text.length) {
-          el.innerHTML += text[i] === '\n' ? '<br>' : text[i];
-          i++;
-        } else {
-          clearInterval(t);
-          if (cb) cb();
-        }
-      }, 50);
+    function type(text, el, cb) {
+      let i=0;
+      const int = setInterval(()=>{
+        if(i<text.length){el.innerHTML += text[i]==='\n'?'<br>':text[i];i++}
+        else{clearInterval(int);if(cb)cb()}
+      },45);
     }
 
-    typeWriter(introText, typing, () => {
-      typing.innerHTML += '<span class="cursor"></span>';
-      loadBTCData();
-    });
+    type(intro, typingEl, ()=>typingEl.innerHTML += '<span class="cursor"></span>');
 
-    async function loadBTCData() {
+    // Resize chart canvas properly
+    function resizeChart() {
+      chartCanvas.width = chartCanvas.offsetWidth * devicePixelRatio;
+      chartCanvas.height = chartCanvas.offsetHeight * devicePixelRatio;
+      ctx.scale(devicePixelRatio, devicePixelRatio);
+    }
+    window.addEventListener('resize', resizeChart);
+    resizeChart();
+
+    let prices = [];
+    let currentPrice = 0;
+    let change24h = 0;
+
+    async function fetchBTC() {
       try {
-        const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true');
-        const data = await response.json();
-        const currentPrice = data.bitcoin.usd;
-        const change = data.bitcoin.usd_24h_change;
-        currentPriceEl.innerHTML = `BTC $${currentPrice.toLocaleString()} <span class="${change >= 0 ? 'price-up' : 'price-down'}">${change >= 0 ? '↑' : '↓'}${Math.abs(change).toFixed(2)}%</span>`;
+        // Current price
+        const res1 = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true', {
+          headers: {'accept': 'application/json'}
+        });
+        const data = await res1.json();
+        currentPrice = data.bitcoin.usd;
+        change24h = data.bitcoin.usd_24h_change;
 
-        // Fetch historical for chart
-        const histResponse = await fetch('https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=1&interval=hourly');
-        const histData = await histResponse.json();
-        const prices = histData.prices.map(p => p[1]);
-        const labels = histData.prices.map((_, i) => `${i + 1}h`);
+        priceBox.innerHTML = `BTC $${currentPrice.toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:0})} 
+          <span class="${change24h>=0?'up':'down'}">${change24h>=0?'↑':'↓'}${Math.abs(change24h).toFixed(2)}%</span>`;
 
-        chartContainer.style.display = 'block';
-        drawChartAnimated(prices, labels);
-      } catch (error) {
-        console.error('Error loading BTC data:', error);
-        currentPriceEl.innerHTML = 'Error loading BTC data';
+        // 24h hourly data
+        const res2 = await fetch('https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=1&interval=hourly');
+        const hist = await res2.json();
+        prices = hist.prices.map(p => p[1]);
+
+        drawChart();
+      } catch(e) {
+        priceBox.textContent = "API down – still stacking";
       }
     }
 
-    function drawChartAnimated(prices, labels) {
-      chartCanvas.width = chartCanvas.offsetWidth;
-      chartCanvas.height = chartCanvas.offsetHeight;
-      const padding = 40;
-      const width = chartCanvas.width - 2 * padding;
-      const height = chartCanvas.height - 2 * padding;
+    function drawChart() {
+      resizeChart();
+      ctx.clearRect(0,0,chartCanvas.width,chartCanvas.height);
 
-      // Normalize prices
-      const maxPrice = Math.max(...prices);
-      const minPrice = Math.min(...prices);
-      const priceRange = maxPrice - minPrice;
+      const w = chartCanvas.offsetWidth;
+      const h = chartCanvas.offsetHeight;
+      const pad = 50;
 
-      // Animation vars
-      let animStep = 0;
-      const totalSteps = prices.length * 10; // Smooth animation
-
-      function animate() {
-        chartCtx.clearRect(0, 0, chartCanvas.width, chartCanvas.height);
-        chartCtx.strokeStyle = '#00bfff';
-        chartCtx.lineWidth = 2;
-        chartCtx.fillStyle = '#00bfff';
-        chartCtx.font = '12px monospace';
-
-        // Draw axes
-        chartCtx.beginPath();
-        chartCtx.moveTo(padding, padding);
-        chartCtx.lineTo(padding, height + padding);
-        chartCtx.lineTo(width + padding, height + padding);
-        chartCtx.stroke();
-
-        // Draw labels (y-axis prices, x-axis hours)
-        prices.slice(0, Math.floor(animStep / 10) + 1).forEach((price, i) => {
-          if (i % 3 === 0) { // Every 3rd for x labels
-            chartCtx.fillText(labels[i], padding + (i / (prices.length - 1)) * width - 10, height + padding + 15);
-          }
-        });
-        const yTicks = [minPrice, (minPrice + maxPrice) / 2, maxPrice];
-        yTicks.forEach(price => {
-          const y = height
+      const maxP = Math
