@@ -49,7 +49,7 @@ window.addEventListener('resize', () => { s.width = innerWidth; s.height = inner
   requestAnimationFrame(n);
 })();
 
-// Typing intro
+// Typing
 const intro = `welcome to the fransoo.com finance portal
 
 here's the live BTC chart & price`;
@@ -89,7 +89,7 @@ async function load(tf) {
   else if (tf === '7d')   { interval = '1h';  limit = 168; }
   else if (tf === '30d')  { interval = '4h';  limit = 180; }
   else if (tf === 'ytd')  { interval = '1d';  limit = 365; }
-  else                     { interval = '1w';  limit = 260; } // ALL
+  else { interval = '1w'; limit = 1000; } // ALL — Binance max is 1000, covers 2017–now
 
   const r = await fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${interval}&limit=${limit}`);
   const data = await r.json();
@@ -112,31 +112,23 @@ function draw(prices, times, tf) {
   ctx.fillStyle = 'rgba(0,191,255,0.12)';
   ctx.beginPath();
   prices.forEach((p, i) => {
-    const x = pad + i * (cw / (prices.length - 1));
+    const x = pad + i * cw / (prices.length - 1);
     const y = H - pad - ((p - min) / range) * ch;
     i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
   });
-  ctx.lineTo(W - pad, H - pad);
-  ctx.lineTo(pad, H - pad);
-  ctx.closePath();
-  ctx.fill();
+  ctx.lineTo(W - pad, H - pad); ctx.lineTo(pad, H - pad); ctx.closePath(); ctx.fill();
 
   // Line
-  ctx.strokeStyle = '#00bfff';
-  ctx.lineWidth = 2.3;
-  ctx.beginPath();
+  ctx.strokeStyle = '#00bfff'; ctx.lineWidth = 2.3; ctx.beginPath();
   prices.forEach((p, i) => {
-    const x = pad + i * (cw / (prices.length - 1));
+    const x = pad + i * cw / (prices.length - 1);
     const y = H - pad - ((p - min) / range) * ch;
     i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
   });
   ctx.stroke();
 
-  // Horizontal grid + Y labels
-  ctx.strokeStyle = '#003340';
-  ctx.fillStyle = '#00bfff';
-  ctx.font = '14px monospace';
-  ctx.textAlign = 'right';
+  // Y grid + labels
+  ctx.strokeStyle = '#003340'; ctx.fillStyle = '#00bfff'; ctx.font = '14px monospace'; ctx.textAlign = 'right';
   for (let i = 0; i <= 4; i++) {
     const y = pad + i * (ch / 4);
     ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(W - pad, y); ctx.stroke();
@@ -144,33 +136,31 @@ function draw(prices, times, tf) {
     ctx.fillText('$' + val.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ','), W - pad - 10, y + 6);
   }
 
-  // X-axis labels — PERFECT real dates/times
+  // X-axis labels — FINAL CORRECT VERSION
   ctx.textAlign = 'center';
-  const labelsCount = 6;
-  for (let i = 0; i <= labelsCount; i++) {
-    const idx = Math.round(i * (prices.length - 1) / labelsCount);
+  const count = 6;
+  for (let i = 0; i <= count; i++) {
+    const idx = Math.round(i * (prices.length - 1) / count);
     const x = pad + idx * cw / (prices.length - 1);
-    const date = times[idx];
+    const d = times[idx];
 
     let label = '';
     if (tf === '1h') {
-      label = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }).replace(/AM|PM/, '');
+      label = d.toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit'}).replace(/:\d\d$/,'');
     } else if (tf === '1d') {
-      label = date.getHours().toString().padStart(2, '0') + 'h';
+      label = d.getHours().toString().padStart(2,'0') + 'h';
     } else if (tf === '7d' || tf === '30d') {
-      label = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      label = d.toLocaleDateString('en-US', {month:'short', day:'numeric'});
     } else if (tf === 'ytd') {
-      label = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      label = d.toLocaleDateString('en-US', {month:'short', day:'numeric'});
     } else { // ALL
-      label = date.getFullYear();
+      label = d.getFullYear().toString();
     }
-
     ctx.fillText(label, x, H - pad + 24);
   }
 
   // Border
-  ctx.strokeStyle = '#00bfff';
-  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = '#00bfff'; ctx.lineWidth = 1.5;
   ctx.strokeRect(pad, pad, cw, ch);
 }
 
