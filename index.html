@@ -6,35 +6,27 @@
 <title>fransoo.com | Finance Portal</title>
 <style>
   body{background:#000;color:#00bfff;font-family:'Courier New',monospace;margin:0;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;overflow:hidden}
-  #static{position:absolute;inset:0;opacity:0.15;pointer-events:none;z-index:1}
-  .container{z-index:2;width:100%;max-width:1200px;padding:10px;box-sizing:border-box;display:flex;flex-direction:column;align-items:center}
-  .typing{font-size:clamp(16px, 4vw, 22px);white-space:pre-line;text-align:center;margin-bottom:10px}
+  #static{position:absolute;inset:0;opacity:0.45;pointer-events:none;z-index:1}
+  .container{z-index:2;width:100%;max-width:1100px;padding:10px;box-sizing:border-box;display:flex;flex-direction:column;align-items:center}
+  .typing{font-size:clamp(16px,4vw,22px);white-space:pre-line;text-align:center;margin-bottom:8px}
   .cursor{display:inline-block;width:10px;height:1.2em;background:#00bfff;animation:b 1s infinite;vertical-align:middle}
   @keyframes b{0%,50%{opacity:1}51%,100%{opacity:0}}
-  
-  #price-live{font-size:clamp(28px, 7vw, 38px);font-weight:bold;margin:10px 0 5px;z-index:10;letter-spacing:1px;text-shadow:0 0 15px #00bfff}
+  #price-live{font-size:clamp(30px,8vw,42px);font-weight:bold;margin:10px 0 15px;z-index:10;text-shadow:0 0 15px #00bfff}
   .up{color:#0f8}.down{color:#f44}
-  
-  #header{display:flex;justify-content:space-between;align-items:center;width:100%;max-width:1100px;padding:0 15px;box-sizing:border-box}
-  select{background:#000;border:1px solid #00bfff;color:#00bfff;padding:10px 16px;font-size:16px;font-family:inherit;border-radius:6px}
-  
-  #chart-container{position:relative;width:100%;max-width:1100px;height:60vh;border:1px solid #00bfff;margin:10px 0;background:#000}
+  #chart-container{position:relative;width:100%;max-width:1100px;height:60vh;border:1px solid #00bfff;background:#000}
   canvas{width:100%!important;height:100%!important;display:block}
-  
-  #change{font-size:clamp(16px, 4vw, 20px);margin-top:8px;font-weight:bold}
-  
-  @media (max-width: 768px) {
-    #header{flex-direction:column;gap:10px}
-    select{width:100%;max-width:300px}
-    #chart-container{height:55vh}
-  }
+  select{position:absolute;top:12px;left:12px;z-index:10;background:#000;border:1px solid #00bfff;color:#00bfff;padding:10px 18px;font-size:16px;border-radius:6px}
+  #change{font-size:clamp(17px,4.5vw,21px);margin-top:10px;font-weight:bold}
 </style>
 </head>
 <body>
 <canvas id="static"></canvas>
 
 <div class="container">
-  <div id="header">
+  <div class="typing" id="typing"></div>
+  <div id="price-live">BTC $--.---</div>
+
+  <div id="chart-container">
     <select id="tf">
       <option value="1h">1H</option>
       <option value="1d">1D</option>
@@ -43,12 +35,6 @@
       <option value="ytd">YTD</option>
       <option value="all">ALL</option>
     </select>
-  </div>
-
-  <div class="typing" id="typing"></div>
-  <div id="price-live">BTC $--.---</div>
-
-  <div id="chart-container">
     <canvas id="c"></canvas>
   </div>
   
@@ -57,146 +43,131 @@
 
 <script>
 // Static noise
-const s = document.getElementById('static'), ctx2 = s.getContext('2d');
-s.width = innerWidth; s.height = innerHeight;
-window.addEventListener('resize', () => { s.width = innerWidth; s.height = innerHeight; });
-(function n() {
-  const img = ctx2.createImageData(s.width, s.height);
-  const buf = new Uint32Array(img.data.buffer);
-  for (let i = 0; i < buf.length; i++) if (Math.random() < 0.09) buf[i] = 0x33ffffff;
-  ctx2.putImageData(img, 0, 0);
-  requestAnimationFrame(n);
-})();
+const s=document.getElementById('static'),ctx2=s.getContext('2d');
+s.width=innerWidth;s.height=innerHeight;
+window.addEventListener('resize',()=>{s.width=innerWidth;s.height=innerHeight});
+(function n(){const i=ctx2.createImageData(s.width,s.height),d=new Uint32Array(i.data.buffer);
+for(let j=0;j<d.length;j++)if(Math.random()<0.09)d[j]=0x33ffffff;ctx2.putImageData(i,0,0);requestAnimationFrame(n)})();
 
 // Typing
-const intro = `welcome to the fransoo.com finance portal
+const intro=`welcome to the fransoo.com finance portal
 
 here's the live BTC chart & price`;
-const typing = document.getElementById('typing');
-let i = 0;
-const ti = setInterval(() => {
-  if (i < intro.length) { typing.innerHTML += intro[i] === '\n' ? '<br>' : intro[i]; i++; }
-  else { clearInterval(ti); typing.innerHTML += '<span class="cursor"></span>'; }
-}, 45);
+const typing=document.getElementById('typing');
+let i=0;
+const ti=setInterval(()=>{if(i<intro.length){typing.innerHTML+=intro[i]==='\n'?'<br>':intro[i];i++}
+else{clearInterval(ti);typing.innerHTML+='<span class="cursor"></span>'}},45);
 
 // Chart
-const canvas = document.getElementById('c'), ctx = canvas.getContext('2d');
-const priceLive = document.getElementById('price-live');
-const changeEl = document.getElementById('change');
-const sel = document.getElementById('tf');
+const canvas=document.getElementById('c'),ctx=canvas.getContext('2d');
+const priceLive=document.getElementById('price-live');
+const changeEl=document.getElementById('change');
+const sel=document.getElementById('tf');
 
-function resize() {
-  canvas.width = canvas.offsetWidth * devicePixelRatio;
-  canvas.height = canvas.offsetHeight * devicePixelRatio;
-  ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-}
-window.addEventListener('resize', resize);
-resize();
+function resize(){canvas.width=canvas.offsetWidth*devicePixelRatio;canvas.height=canvas.offsetHeight*devicePixelRatio;
+ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0)}
+window.addEventListener('resize',resize);resize();
 
-async function updatePrice() {
-  try {
-    const r = await fetch('https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT');
-    const d = await r.json();
-    const p = +d.lastPrice, ch = +d.priceChangePercent;
-    priceLive.innerHTML = `BTC $${p.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0})} <span class="${ch>=0?'up':'down'}">${ch>=0?'+' : '−'}${Math.abs(ch).toFixed(2)}%</span>`;
-  } catch { priceLive.textContent = "BTC --"; }
+async function updatePrice(){
+  try{
+    const r=await fetch('https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT');
+    const d=await r.json();
+    const p=+d.lastPrice,ch=+d.priceChangePercent;
+    priceLive.innerHTML=`BTC $${p.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0})} <span class="${ch>=0?'up':'down'}">${ch>=0?'+' : '−'}${Math.abs(ch).toFixed(2)}%</span>`;
+  }catch{priceLive.textContent="BTC --"}
 }
 
-async function load(tf) {
-  let interval, limit;
-  if (tf === '1h')   { interval = '1m';  limit = 60; }
-  else if (tf === '1d')   { interval = '5m';  limit = 288; }
-  else if (tf === '7d')   { interval = '1h';  limit = 168; }
-  else if (tf === '30d')  { interval = '4h';  limit = 180; }
-  else if (tf === 'ytd')  { interval = '1d';  limit = 365; }
-  else { interval = '1w'; limit = 1000; }
+async function load(tf){
+  let interval,limit;
+  if(tf==='1h'){interval='1m';limit=60}
+  else if(tf==='1d'){interval='5m';limit=288}
+  else if(tf==='7d'){interval='1h';limit=168}
+  else if(tf==='30d'){interval='4h';limit=180}
+  else if(tf==='ytd'){interval='1d';limit=365}
+  else{interval='1w';limit=1000}
 
-  const r = await fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${interval}&limit=${limit}`);
-  const data = await r.json();
-  if (!data || data.length < 2) return;
+  const r=await fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${interval}&limit=${limit}`);
+  const data=await r.json();
+  if(!data||data.length<2)return;
 
-  const prices = data.map(k => +k[4]);
-  const times = data.map(k => new Date(k[0]));
+  const prices=data.map(k=>+k[4]);
+  const times=data.map(k=>new Date(k[0]));
 
-  const first = prices[0], last = prices[prices.length - 1];
-  const change = ((last - first) / first) * 100;
-  const tfName = sel.options[sel.selectedIndex].text;
-  changeEl.innerHTML = `<span class="${change>=0?'up':'down'}">${change>=0?'+' : '−'}${Math.abs(change).toFixed(2)}%</span> (${tfName})`;
+  const first=prices[0],last=prices[prices.length-1];
+  const change=((last-first)/first)*100;
+  const tfName=sel.options[sel.selectedIndex].text;
+  changeEl.innerHTML=`<span class="${change>=0?'up':'down'}">${change>=0?'+' : '−'}${Math.abs(change).toFixed(2)}%</span> (${tfName})`;
 
-  draw(prices, times, tf);
+  draw(prices,times,tf);
 }
 
-function draw(prices, times, tf) {
+function draw(prices,times,tf){
   resize();
-  const W = canvas.width / devicePixelRatio;
-  const H = canvas.height / devicePixelRatio;
-  ctx.clearRect(0, 0, W, H);
+  const W=canvas.width/devicePixelRatio;
+  const H=canvas.height/devicePixelRatio;
+  ctx.clearRect(0,0,W,H);
 
-  const padX = 70;
-  const padY = 50;
-  const cw = W - padX - 100;  // Extra space on right for price labels
-  const ch = H - 2 * padY;
-  const max = Math.max(...prices), min = Math.min(...prices), range = max - min || 1;
+  const padX=70;
+  const padY=50;
+  const cw=W-padX-110;  // extra right padding for price labels
+  const ch=H-2*padY;
+  const max=Math.max(...prices),min=Math.min(...prices),range=max-min||1;
 
-  // Area fill
-  ctx.fillStyle = 'rgba(0,191,255,0.12)';
+  // Area + Line
+  ctx.fillStyle='rgba(0,191,255,0.12)';
   ctx.beginPath();
-  prices.forEach((p, i) => {
-    const x = padX + i * cw / (prices.length - 1);
-    const y = H - padY - ((p - min) / range) * ch;
-    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-  });
-  ctx.lineTo(W - 100, H - padY); ctx.lineTo(padX, H - padY); ctx.closePath(); ctx.fill();
+  prices.forEach((p,i)=>{const x=padX+i*cw/(prices.length-1);
+    const y=H-padY-((p-min)/range)*ch;
+    i===0?ctx.moveTo(x,y):ctx.lineTo(x,y)});
+  ctx.lineTo(W-110,H-padY);ctx.lineTo(padX,H-padY);ctx.closePath();ctx.fill();
 
-  // Line
-  ctx.strokeStyle = '#00bfff'; ctx.lineWidth = 2.5; ctx.beginPath();
-  prices.forEach((p, i) => {
-    const x = padX + i * cw / (prices.length - 1);
-    const y = H - padY - ((p - min) / range) * ch;
-    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-  });
+  ctx.strokeStyle='#00bfff';ctx.lineWidth=2.5;ctx.beginPath();
+  prices.forEach((p,i)=>{const x=padX+i*cw/(prices.length-1);
+    const y=H-padY-((p-min)/range)*ch;
+    i===0?ctx.moveTo(x,y):ctx.lineTo(x,y)});
   ctx.stroke();
 
-  // Horizontal grid
-  ctx.strokeStyle = '#003340';
-  for (let i = 0; i <= 4; i++) {
-    const y = padY + i * (ch / 4);
-    ctx.beginPath(); ctx.moveTo(padX, y); ctx.lineTo(W - 100, y); ctx.stroke();
+  // Grid
+  ctx.strokeStyle='#003340';
+  for(let i=0;i<=4;i++){
+    const y=padY+i*(ch/4);
+    ctx.beginPath();ctx.moveTo(padX,y);ctx.lineTo(W-110,y);ctx.stroke();
   }
 
-  // Y-axis labels — OUTSIDE, FULLY VISIBLE
-  ctx.fillStyle = '#00bfff'; ctx.font = '14px monospace'; ctx.textAlign = 'left';
-  for (let i = 0; i <= 4; i++) {
-    const y = padY + i * (ch / 4);
-    const val = max - i * (range / 4);
-    ctx.fillText('$' + val.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ','), W - 95, y + 6);
+  // Y labels — outside right
+  ctx.fillStyle='#00bfff';ctx.font='14px monospace';ctx.textAlign='left';
+  for(let i=0;i<=4;i++){
+    const y=padY+i*(ch/4);
+    const val=max-i*(range/4);
+    ctx.fillText('$'+val.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g,','),W-105,y+6);
   }
 
-  // X-axis labels
-  ctx.textAlign = 'center';
-  const count = 6;
-  for (let i = 0; i <= count; i++) {
-    const idx = Math.round(i * (prices.length - 1) / count);
-    const x = padX + idx * cw / (prices.length - 1);
-    const d = times[idx];
-    let label = '';
-    if (tf === '1h') label = d.toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit'}).replace(/:\d\d$/,'');
-    else if (tf === '1d') label = d.getHours().toString().padStart(2,'0') + 'h';
-    else if (tf === '7d' || tf === '30d') label = d.toLocaleDateString('en-US', {month:'short', day:'numeric'});
-    else if (tf === 'ytd') label = d.toLocaleDateString('en-US', {month:'short', day:'numeric'});
-    else label = d.getFullYear();
-    ctx.fillText(label, x, H - padY + 28);
+  // X labels — 6 on desktop, only 4 on mobile
+  ctx.textAlign='center';
+  const isMobile = window.innerWidth <= 768;
+  const count = isMobile ? 4 : 6;
+  for(let i=0;i<=count;i++){
+    const idx=Math.round(i*(prices.length-1)/count);
+    const x=padX+idx*cw/(prices.length-1);
+    const d=times[idx];
+    let label='';
+    if(tf==='1h') label=d.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}).replace(/:\d\d$/,'');
+    else if(tf==='1d') label=d.getHours().toString().padStart(2,'0')+'h';
+    else if(tf==='7d'||tf==='30d') label=d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+    else if(tf==='ytd') label=d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+    else label=d.getFullYear();
+    ctx.fillText(label,x,H-padY+28);
   }
 
   // Border
-  ctx.strokeStyle = '#00bfff'; ctx.lineWidth = 1.5;
-  ctx.strokeRect(padX, padY, cw, ch);
+  ctx.strokeStyle='#00bfff';ctx.lineWidth=1.5;
+  ctx.strokeRect(padX,padY,cw,ch);
 }
 
-sel.onchange = () => load(sel.value);
+sel.onchange=()=>load(sel.value);
 updatePrice();
 load('7d');
-setInterval(() => { updatePrice(); load(sel.value); }, 30000);
+setInterval(()=>{updatePrice();load(sel.value)},30000);
 </script>
 </body>
 </html>
