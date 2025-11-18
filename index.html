@@ -15,7 +15,8 @@
     .up {color:#00ff00}
     .down {color:#ff0044}
     #chart-container {margin-top:50px;width:100%;height:50vh;background:#000;border:1px solid #00bfff;box-sizing:border-box}
-    canvas#chart {width:100%;height:100%}
+    canvas#chart {width:100%;height:100%;display:block}
+    #loading {color:#666;font-size:14px;margin-top:10px}
   </style>
 </head>
 <body>
@@ -23,7 +24,7 @@
   <div id="price-box">BTC $--.---</div>
   <div class="container">
     <div class="typing" id="typing"></div>
-    <div id="chart-container"><canvas id="chart"></canvas></div>
+    <div id="chart-container"><canvas id="chart"></canvas><div id="loading">Loading chart...</div></div>
   </div>
 
   <script>
@@ -43,6 +44,7 @@ fransoo.com`;
     const typingEl = document.getElementById('typing');
     const priceBox = document.getElementById('price-box');
     const chartCanvas = document.getElementById('chart');
+    const loadingEl = document.getElementById('loading');
     const ctx = chartCanvas.getContext('2d');
 
     function type(text, el, cb) {
@@ -57,9 +59,10 @@ fransoo.com`;
 
     // Resize chart canvas properly
     function resizeChart() {
-      chartCanvas.width = chartCanvas.offsetWidth * devicePixelRatio;
-      chartCanvas.height = chartCanvas.offsetHeight * devicePixelRatio;
-      ctx.scale(devicePixelRatio, devicePixelRatio);
+      const rect = chartCanvas.getBoundingClientRect();
+      chartCanvas.width = rect.width * window.devicePixelRatio;
+      chartCanvas.height = rect.height * window.devicePixelRatio;
+      ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
     }
     window.addEventListener('resize', resizeChart);
     resizeChart();
@@ -68,12 +71,16 @@ fransoo.com`;
     let currentPrice = 0;
     let change24h = 0;
 
+    // CORS proxy for Coingecko
+    const proxyUrl = 'https://api.allorigins.win/raw?url=';
+
     async function fetchBTC() {
       try {
-        // Current price
-        const res1 = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true', {
-          headers: {'accept': 'application/json'}
-        });
+        loadingEl.textContent = 'Fetching BTC data...';
+        // Current price via proxy
+        const url1 = encodeURIComponent('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true');
+        const res1 = await fetch(proxyUrl + url1);
+        if (!res1.ok) throw new Error('Proxy fail');
         const data = await res1.json();
         currentPrice = data.bitcoin.usd;
         change24h = data.bitcoin.usd_24h_change;
@@ -81,23 +88,85 @@ fransoo.com`;
         priceBox.innerHTML = `BTC $${currentPrice.toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:0})} 
           <span class="${change24h>=0?'up':'down'}">${change24h>=0?'↑':'↓'}${Math.abs(change24h).toFixed(2)}%</span>`;
 
-        // 24h hourly data
-        const res2 = await fetch('https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=1&interval=hourly');
+        // 24h hourly data via proxy
+        const url2 = encodeURIComponent('https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=1&interval=hourly');
+        const res2 = await fetch(proxyUrl + url2);
+        if (!res2.ok) throw new Error('Proxy fail');
         const hist = await res2.json();
         prices = hist.prices.map(p => p[1]);
 
+        loadingEl.style.display = 'none';
         drawChart();
       } catch(e) {
-        priceBox.textContent = "API down – still stacking";
+        console.error(e);
+        priceBox.innerHTML = `BTC -- <span class="down">API jammed – HODL anyway</span>`;
+        loadingEl.textContent = 'API jammed – refresh page';
       }
     }
 
     function drawChart() {
       resizeChart();
+      const w = chartCanvas.width / window.devicePixelRatio;
+      const h = chartCanvas.height / window.devicePixelRatio;
       ctx.clearRect(0,0,chartCanvas.width,chartCanvas.height);
 
-      const w = chartCanvas.offsetWidth;
-      const h = chartCanvas.offsetHeight;
       const pad = 50;
+      const maxP = Math.max(...prices);
+      const minP = Math.min(...prices);
+      const range = maxP - minP || 1;
 
-      const maxP = Math
+      let step = 0;
+      function anim() {
+        ctx.clearRect(0,0,chartCanvas.width,chartCanvas.height);
+
+        // Grid lines
+        ctx.strokeStyle = '#003340';
+        ctx.lineWidth = 1;
+        for(let i=0;i<5;i++){
+          const y = pad + (h-2*pad)/4 * i;
+          ctx.beginPath(); ctx.moveTo(pad * window.devicePixelRatio,y * window.devicePixelRatio); 
+          ctx.lineTo((w-pad) * window.devicePixelRatio,y * window.devicePixelRatio); 
+          ctx.stroke();
+        }
+
+        // Animate line
+        ctx.strokeStyle = '#00bfff';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        const pointsToDraw = Math.min(Math.floor(step/3), prices.length - 1);
+        for(let i=0;i<=pointsToDraw;i++){
+          const x = pad + (w-2*pad)/(prices.length-1) * i;
+          const y = h-pad - ((prices[i]-minP)/range)*(h-2*pad);
+          const px = x * window.devicePixelRatio;
+          const py = y * window.devicePixelRatio;
+          i===0 ? ctx.moveTo(px,py) : ctx.lineTo(px,py);
+        }
+        ctx.stroke();
+
+        // Y-axis labels
+        ctx.fillStyle = '#00bfff';
+        ctx.font = `${14 * window.devicePixelRatio}px monospace`;
+        ctx.textAlign = 'right';
+        [maxP, (maxP + minP)/2, minP].forEach((p,i)=>{
+          const y = (h - pad - i * (h-2*pad)/2) * window.devicePixelRatio;
+          ctx.fillText(`$${p.toFixed(0)}`, (w-pad+10) * window.devicePixelRatio, y + 4 * window.devicePixelRatio);
+        });
+
+        // X-axis labels (hours)
+        ctx.textAlign = 'center';
+        for(let i=0; i<prices.length; i+=prices.length/4 |0){
+          const x = (pad + (w-2*pad)/(prices.length-1) * i) * window.devicePixelRatio;
+          ctx.fillText(`${i}h`, x, (h - 20) * window.devicePixelRatio);
+        }
+
+        if(step < prices.length*3) {step++; requestAnimationFrame(anim);}
+      }
+      anim();
+    }
+
+    // Kick it off
+    fetchBTC();
+    setInterval(fetchBTC, 30000); // Refresh every 30s
+  </script>
+</body>
+</html>
