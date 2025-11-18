@@ -9,16 +9,17 @@
   #static{position:absolute;inset:0;opacity:0.15;pointer-events:none;z-index:1}
   .container{z-index:2;text-align:center;padding:20px;width:100%;max-width:1000px;box-sizing:border-box}
   .typing{font-size:20px;white-space:pre-line}
-  .cursor{display:inline-block;width:10px;height:22px;background:#00bfff;animation:b 1s infinite}@keyframes b{0%,50%{opacity:1}51%,100%{opacity:0}}
+  .cursor{display:inline-block;width:10px;height:22px;background:#00bfff;animation:b 1s infinite}
+  @keyframes b{0%,50%{opacity:1}51%,100%{opacity:0}}
   #price{position:absolute;top:20px;right:20px;font-size:28px;font-weight:bold;z-index:3}
-  .up{color:#0f0}.down{color:#f44}
+  .up{color:#0f8}.down{color:#f44}
   #chart-container{position:relative;margin-top:30px;width:100%;height:60vh;border:1px solid #00bfff}
   canvas{width:100%;height:100%;display:block}
   select{position:absolute;top:12px;left:12px;z-index:3;background:#000;border:1px solid #00bfff;color:#00bfff;padding:8px 16px;font-size:15px;font-family:inherit}
 </style>
 </head>
 <body>
-<canvas id="static"></canvas"></canvas>
+<canvas id="static"></canvas>
 <div id="price">BTC $--.---</div>
 <div class="container">
   <div class="typing" id="typing"></div>
@@ -37,18 +38,18 @@
 
 <script>
 // Static noise
-const s=document.getElementById('staticcanvas'),x=s.getContext('2d');
+const s=document.getElementById('static'),ctx2=s.getContext('2d');
 s.width=innerWidth;s.height=innerHeight;
-window.addEventListener('resize',()=>{s.width=innerWidth,s.height=innerHeight);
-(function n(){const i=x.createImageData(s.width,s.height),d=new Uint32Array(i.data.buffer);
-for(let j=0;j<d.length;j++)if(Math.random()<0.09)d[j]=0x33ffffff;x.putImageData(i,0,0);requestAnimationFrame(n)})();
+window.addEventListener('resize',()=>{s.width=innerWidth;s.height=innerHeight});
+(function n(){const i=ctx2.createImageData(s.width,s.height),d=new Uint32Array(i.data.buffer);
+for(let j=0;j<d.length;j++)if(Math.random()<0.09)d[j]=0x33ffffff;ctx2.putImageData(i,0,0);requestAnimationFrame(n)})();
 
 // Typing intro
 const intro=`welcome to the fransoo.com finance portal
 
 here's the live BTC chart & price`;
 const t=document.getElementById('typing');
-let i=0;const typeInt=setInterval(()=>{if(i<intro.length){t.innerHTML+=intro[i]==='\n'?'<br>':intro[i];i++}else{clearInterval(typeInt);t.innerHTML+='<span class="cursor"></span>'}},45);
+let i=0;const ti=setInterval(()=>{if(i<intro.length){t.innerHTML+=intro[i]==='\n'?'<br>':intro[i];i++}else{clearInterval(ti);t.innerHTML+='<span class="cursor"></span>'}},45);
 
 // Chart
 const canvas=document.getElementById('c'),ctx=canvas.getContext('2d');
@@ -58,39 +59,38 @@ function resize(){canvas.width=canvas.offsetWidth*devicePixelRatio;canvas.height
 window.addEventListener('resize',resize);resize();
 
 async function updatePrice(){
-  const r=await fetch('https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT');
-  const d=await r.json();
-  const p=+d.lastPrice, ch=+d.priceChangePercent;
-  price.innerHTML=`BTC $${p.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0})} <span class="${ch>=0?'up':'down'}">${ch>=0?'Up':'Down'}${Math.abs(ch).toFixed(2)}%</span>`;
+  try{
+    const r=await fetch('https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT');
+    const d=await r.json();
+    const p=+d.lastPrice, ch=+d.priceChangePercent;
+    price.innerHTML=`BTC $${p.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0})} <span class="${ch>=0?'up':'down'}">${ch>=0?'Up':'Down'}${Math.abs(ch).toFixed(2)}%</span>`;
+  }catch(e){price.textContent="BTC --"}
 }
 
 async function load(tf){
   let intv, lim;
   if(tf==='1h'){intv='1m';lim=60}
-  else if(tf==='1d'){intv='5m';lim=288}   // 5-min candles = perfect 24h detail
+  else if(tf==='1d'){intv='5m';lim=288}
   else if(tf==='7d'){intv='1h';lim=168}
   else if(tf==='30d'){intv='4h';lim=180}
   else if(tf==='ytd'){intv='1d';lim=365}
-  else{intv='1w';lim=260} // ALL ≈ 5 years
+  else{intv='1w';lim=260}
 
   const r=await fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${intv}&limit=${lim}`);
   const data=await r.json();
   const prices=data.map(k=>+k[4]);
   const times=data.map(k=>new Date(k[0]));
-
   draw(prices,times,tf);
 }
 
-function draw(p, t, tf){
+function draw(p,t,tf){
   resize();
   const W=canvas.width/devicePixelRatio, H=canvas.height/devicePixelRatio;
   ctx.clearRect(0,0,W,H);
-  const pad=65;
-  const cw=W-2*pad, ch=H-2*pad;
-
+  const pad=65, cw=W-2*pad, ch=H-2*pad;
   const max=Math.max(...p), min=Math.min(...p), range=max-min||1;
 
-  // Area fill
+  // Area
   ctx.fillStyle='rgba(0,191,255,0.12)';
   ctx.beginPath();
   p.forEach((pr,i)=>{const x=pad+i*cw/(p.length-1), y=H-pad-((pr-min)/range)*ch; i===0?ctx.moveTo(x,y):ctx.lineTo(x,y)});
@@ -101,9 +101,8 @@ function draw(p, t, tf){
   p.forEach((pr,i)=>{const x=pad+i*cw/(p.length-1), y=H-pad-((pr-min)/range)*ch; i===0?ctx.moveTo(x,y):ctx.lineTo(x,y)});
   ctx.stroke();
 
-  // Grid + Y labels
-  ctx.strokeStyle='#003340';ctx.lineWidth=1;ctx.fillStyle='#00bfff';ctx.font='14px monospace';ctx.textAlign='right';
-  ';
+  // Y grid + labels
+  ctx.strokeStyle='#003340';ctx.fillStyle='#00bfff';ctx.font='14px monospace';ctx.textAlign='right';
   for(let i=0;i<=4;i++){
     const y=pad+i*ch/4;
     ctx.beginPath();ctx.moveTo(pad,y);ctx.lineTo(W-pad,y);ctx.stroke();
@@ -111,20 +110,18 @@ function draw(p, t, tf){
     ctx.fillText('$'+val.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g,','),W-pad-10,y+6);
   }
 
-  // X labels — REAL dates/times
+  // X labels — proper dates/times
   ctx.textAlign='center';
   const steps=6;
   for(let i=0;i<=steps;i++){
     const idx=Math.round(i*(p.length-1)/steps);
     const x=pad+idx*cw/(p.length-1);
     const d=t[idx];
-
-    let label='';
-    if(tf==='1h') label=d.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}).replace(':00','');
+    let label;
+    if(tf==='1h') label=d.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}).replace(/:\d\d$/,'');
     else if(tf==='1d') label=d.getHours()+'h';
-    else if(tf==='7d' || tf==='30d') label=d.toLocaleDateString('en-US',{month:'short',day:'numeric'}).replace(' ','\n');
-    else label=d.toLocaleDateString('en-US',tf==='all'?{year:'numeric'}:{month:'short',day:'numeric'}).replace(' ','\n');
-
+    else if(tf==='7d'||tf==='30d') label=d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+    else label=d.toLocaleDateString('en-US',tf==='all'?{year:'numeric',month:'short'}:{month:'short',day:'numeric'});
     ctx.fillText(label,x,H-pad+24);
   }
 
