@@ -6,22 +6,24 @@
 <title>fransoo.com | Finance Portal</title>
 <style>
   body{background:#000;color:#00bfff;font-family:'Courier New',monospace;margin:0;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;overflow:hidden}
-  #static{position:absolute;inset:0;opacity:0.45;pointer-events:none;z-index:1}
+  #static{position:absolute;inset:0;opacity:0.15;pointer-events:none;z-index:1}
   .container{z-index:2;text-align:center;padding:20px;width:100%;max-width:1000px;box-sizing:border-box}
   .typing{font-size:20px;white-space:pre-line}
   .cursor{display:inline-block;width:10px;height:22px;background:#00bfff;animation:b 1s infinite}
   @keyframes b{0%,50%{opacity:1}51%,100%{opacity:0}}
-  #price{position:absolute;top:20px;right:20px;font-size:28px;font-weight:bold;z-index:3}
+  #price-live{position:absolute;top:8px;left:50%;transform:translateX(-50%);font-size:32px;font-weight:bold;z-index:10;letter-spacing:1px;text-shadow:0 0 10px #00bfff}
   .up{color:#0f8}.down{color:#f44}
-  #chart-container{position:relative;margin-top:30px;width:100%;height:60vh;border:1px solid #00bfff}
+  #chart-container{position:relative;margin-top:60px;width:100%;height:60vh;border:1px solid #00bfff}
   canvas{width:100%;height:100%;display:block}
-  select{position:absolute;top:12px;left:12px;z-index:3;background:#000;border:1px solid #00bfff;color:#00bfff;padding:8px 16px;font-size:15px;font-family:inherit}
-  #change{font-size:18px;margin-top:10px;opacity:0.9}
+  select{position:absolute;top:-45px;left:12px;z-index:3;background:#000;border:1px solid #00bfff;color:#00bfff;padding:8px 16px;font-size:15px;font-family:inherit}
+  #change{font-size:19px;margin-top:12px;opacity:0.9;font-weight:bold}
 </style>
 </head>
 <body>
 <canvas id="static"></canvas>
-<div id="price">BTC $--.---</div>
+
+<div id="price-live">BTC $--.---</div>
+
 <div class="container">
   <div class="typing" id="typing"></div>
   <div id="chart-container">
@@ -64,7 +66,7 @@ const ti = setInterval(() => {
 
 // Chart
 const canvas = document.getElementById('c'), ctx = canvas.getContext('2d');
-const priceEl = document.getElementById('price');
+const priceLive = document.getElementById('price-live');
 const changeEl = document.getElementById('change');
 const sel = document.getElementById('tf');
 
@@ -81,8 +83,8 @@ async function updatePrice() {
     const r = await fetch('https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT');
     const d = await r.json();
     const p = +d.lastPrice, ch = +d.priceChangePercent;
-    priceEl.innerHTML = `BTC $${p.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0})} <span class="${ch>=0?'up':'down'}">${ch>=0?'+' : '−'}${Math.abs(ch).toFixed(2)}%</span>`;
-  } catch { priceEl.textContent = "BTC --"; }
+    priceLive.innerHTML = `BTC $${p.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0})} <span class="${ch>=0?'up':'down'}">${ch>=0?'+' : '−'}${Math.abs(ch).toFixed(2)}%</span>`;
+  } catch { priceLive.textContent = "BTC --"; }
 }
 
 async function load(tf) {
@@ -92,7 +94,7 @@ async function load(tf) {
   else if (tf === '7d')   { interval = '1h';  limit = 168; }
   else if (tf === '30d')  { interval = '4h';  limit = 180; }
   else if (tf === 'ytd')  { interval = '1d';  limit = 365; }
-  else { interval = '1w'; limit = 1000; } // ALL
+  else { interval = '1w'; limit = 1000; }
 
   const r = await fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${interval}&limit=${limit}`);
   const data = await r.json();
@@ -101,13 +103,11 @@ async function load(tf) {
   const prices = data.map(k => +k[4]);
   const times = data.map(k => new Date(k[0]));
 
-  // Calculate % change for selected timeframe
-  const first = prices[0];
-  const last = prices[prices.length - 1];
+  // Timeframe % change
+  const first = prices[0], last = prices[prices.length - 1];
   const change = ((last - first) / first) * 100;
   const tfName = sel.options[sel.selectedIndex].text;
   changeEl.innerHTML = `<span class="${change>=0?'up':'down'}">${change>=0?'+' : '−'}${Math.abs(change).toFixed(2)}%</span> (${tfName})`;
-  changeEl.style.fontWeight = 'bold';
 
   draw(prices, times, tf);
 }
@@ -141,13 +141,19 @@ function draw(prices, times, tf) {
   });
   ctx.stroke();
 
-  // Y grid + labels
-  ctx.strokeStyle = '#003340'; ctx.fillStyle = '#00bfff'; ctx.font = '14px monospace'; ctx.textAlign = 'right';
+  // Horizontal grid
+  ctx.strokeStyle = '#003340';
   for (let i = 0; i <= 4; i++) {
     const y = pad + i * (ch / 4);
     ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(W - pad, y); ctx.stroke();
+  }
+
+  // Y-axis labels — NOW OUTSIDE ON THE RIGHT
+  ctx.fillStyle = '#00bfff'; ctx.font = '14px monospace'; ctx.textAlign = 'left';
+  for (let i = 0; i <= 4; i++) {
+    const y = pad + i * (ch / 4);
     const val = max - i * (range / 4);
-    ctx.fillText('$' + val.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ','), W - pad - 10, y + 6);
+    ctx.fillText('$' + val.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ','), W - pad + 8, y + 6);
   }
 
   // X-axis labels
@@ -173,7 +179,7 @@ function draw(prices, times, tf) {
 
 sel.onchange = () => load(sel.value);
 updatePrice();
-load('7d'); // DEFAULT TO 7D ON LOAD
+load('7d'); // Default 7D
 setInterval(() => { updatePrice(); load(sel.value); }, 30000);
 </script>
 </body>
