@@ -71,36 +71,32 @@ fransoo.com`;
     let currentPrice = 0;
     let change24h = 0;
 
-    // CORS proxy for Coingecko
-    const proxyUrl = 'https://api.allorigins.win/raw?url=';
-
     async function fetchBTC() {
       try {
         loadingEl.textContent = 'Fetching BTC data...';
-        // Current price via proxy
-        const url1 = encodeURIComponent('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true');
-        const res1 = await fetch(proxyUrl + url1);
-        if (!res1.ok) throw new Error('Proxy fail');
+        // Binance ticker for current price + 24h change
+        const res1 = await fetch('https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT');
+        if (!res1.ok) throw new Error('Binance fetch fail');
         const data = await res1.json();
-        currentPrice = data.bitcoin.usd;
-        change24h = data.bitcoin.usd_24h_change;
+        currentPrice = parseFloat(data.lastPrice);
+        const changePercent = parseFloat(data.priceChangePercent);
+        change24h = changePercent;
 
         priceBox.innerHTML = `BTC $${currentPrice.toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:0})} 
           <span class="${change24h>=0?'up':'down'}">${change24h>=0?'↑':'↓'}${Math.abs(change24h).toFixed(2)}%</span>`;
 
-        // 24h hourly data via proxy
-        const url2 = encodeURIComponent('https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=1&interval=hourly');
-        const res2 = await fetch(proxyUrl + url2);
-        if (!res2.ok) throw new Error('Proxy fail');
-        const hist = await res2.json();
-        prices = hist.prices.map(p => p[1]);
+        // 24h hourly klines for chart (last 24 hours, 1h intervals = 25 points)
+        const res2 = await fetch('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1h&limit=25');
+        if (!res2.ok) throw new Error('Binance klines fail');
+        const klines = await res2.json();
+        prices = klines.map(k => parseFloat(k[4])); // Close prices
 
         loadingEl.style.display = 'none';
         drawChart();
       } catch(e) {
         console.error(e);
-        priceBox.innerHTML = `BTC -- <span class="down">API jammed – HODL anyway</span>`;
-        loadingEl.textContent = 'API jammed – refresh page';
+        priceBox.innerHTML = `BTC -- <span class="down">Fetch jammed – HODL anyway</span>`;
+        loadingEl.textContent = 'API hiccup – refresh page';
       }
     }
 
@@ -154,7 +150,7 @@ fransoo.com`;
 
         // X-axis labels (hours)
         ctx.textAlign = 'center';
-        for(let i=0; i<prices.length; i+=prices.length/4 |0){
+        for(let i=0; i<prices.length; i+=Math.floor(prices.length/4)){
           const x = (pad + (w-2*pad)/(prices.length-1) * i) * window.devicePixelRatio;
           ctx.fillText(`${i}h`, x, (h - 20) * window.devicePixelRatio);
         }
