@@ -6,7 +6,7 @@
 <title>fransoo.com | Finance Portal</title>
 <style>
   body{background:#000;color:#00bfff;font-family:'Courier New',monospace;margin:0;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;overflow:hidden}
-  #static{position:absolute;inset:0;opacity:0.15;pointer-events:none;z-index:1}
+  #static{position:absolute;inset:0;opacity:0.45;pointer-events:none;z-index:1}
   .container{z-index:2;text-align:center;padding:20px;width:100%;max-width:1000px;box-sizing:border-box}
   .typing{font-size:20px;white-space:pre-line}
   .cursor{display:inline-block;width:10px;height:22px;background:#00bfff;animation:b 1s infinite}
@@ -16,6 +16,7 @@
   #chart-container{position:relative;margin-top:30px;width:100%;height:60vh;border:1px solid #00bfff}
   canvas{width:100%;height:100%;display:block}
   select{position:absolute;top:12px;left:12px;z-index:3;background:#000;border:1px solid #00bfff;color:#00bfff;padding:8px 16px;font-size:15px;font-family:inherit}
+  #change{font-size:18px;margin-top:10px;opacity:0.9}
 </style>
 </head>
 <body>
@@ -26,14 +27,15 @@
   <div id="chart-container">
     <select id="tf">
       <option value="1h">1H</option>
-      <option value="1d" selected>1D</option>
-      <option value="7d">7D</option>
+      <option value="1d">1D</option>
+      <option value="7d" selected>7D</option>
       <option value="30d">30D</option>
       <option value="ytd">YTD</option>
       <option value="all">ALL</option>
     </select>
     <canvas id="c"></canvas>
   </div>
+  <div id="change"></div>
 </div>
 
 <script>
@@ -63,6 +65,7 @@ const ti = setInterval(() => {
 // Chart
 const canvas = document.getElementById('c'), ctx = canvas.getContext('2d');
 const priceEl = document.getElementById('price');
+const changeEl = document.getElementById('change');
 const sel = document.getElementById('tf');
 
 function resize() {
@@ -78,7 +81,7 @@ async function updatePrice() {
     const r = await fetch('https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT');
     const d = await r.json();
     const p = +d.lastPrice, ch = +d.priceChangePercent;
-    priceEl.innerHTML = `BTC $${p.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0})} <span class="${ch>=0?'up':'down'}">${ch>=0?'Up':'Down'}${Math.abs(ch).toFixed(2)}%</span>`;
+    priceEl.innerHTML = `BTC $${p.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0})} <span class="${ch>=0?'up':'down'}">${ch>=0?'+' : '−'}${Math.abs(ch).toFixed(2)}%</span>`;
   } catch { priceEl.textContent = "BTC --"; }
 }
 
@@ -89,12 +92,23 @@ async function load(tf) {
   else if (tf === '7d')   { interval = '1h';  limit = 168; }
   else if (tf === '30d')  { interval = '4h';  limit = 180; }
   else if (tf === 'ytd')  { interval = '1d';  limit = 365; }
-  else { interval = '1w'; limit = 1000; } // ALL — Binance max is 1000, covers 2017–now
+  else { interval = '1w'; limit = 1000; } // ALL
 
   const r = await fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${interval}&limit=${limit}`);
   const data = await r.json();
+  if (!data || data.length < 2) return;
+
   const prices = data.map(k => +k[4]);
   const times = data.map(k => new Date(k[0]));
+
+  // Calculate % change for selected timeframe
+  const first = prices[0];
+  const last = prices[prices.length - 1];
+  const change = ((last - first) / first) * 100;
+  const tfName = sel.options[sel.selectedIndex].text;
+  changeEl.innerHTML = `<span class="${change>=0?'up':'down'}">${change>=0?'+' : '−'}${Math.abs(change).toFixed(2)}%</span> (${tfName})`;
+  changeEl.style.fontWeight = 'bold';
+
   draw(prices, times, tf);
 }
 
@@ -136,26 +150,19 @@ function draw(prices, times, tf) {
     ctx.fillText('$' + val.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ','), W - pad - 10, y + 6);
   }
 
-  // X-axis labels — FINAL CORRECT VERSION
+  // X-axis labels
   ctx.textAlign = 'center';
   const count = 6;
   for (let i = 0; i <= count; i++) {
     const idx = Math.round(i * (prices.length - 1) / count);
     const x = pad + idx * cw / (prices.length - 1);
     const d = times[idx];
-
     let label = '';
-    if (tf === '1h') {
-      label = d.toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit'}).replace(/:\d\d$/,'');
-    } else if (tf === '1d') {
-      label = d.getHours().toString().padStart(2,'0') + 'h';
-    } else if (tf === '7d' || tf === '30d') {
-      label = d.toLocaleDateString('en-US', {month:'short', day:'numeric'});
-    } else if (tf === 'ytd') {
-      label = d.toLocaleDateString('en-US', {month:'short', day:'numeric'});
-    } else { // ALL
-      label = d.getFullYear().toString();
-    }
+    if (tf === '1h') label = d.toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit'}).replace(/:\d\d$/,'');
+    else if (tf === '1d') label = d.getHours().toString().padStart(2,'0') + 'h';
+    else if (tf === '7d' || tf === '30d') label = d.toLocaleDateString('en-US', {month:'short', day:'numeric'});
+    else if (tf === 'ytd') label = d.toLocaleDateString('en-US', {month:'short', day:'numeric'});
+    else label = d.getFullYear();
     ctx.fillText(label, x, H - pad + 24);
   }
 
@@ -166,7 +173,7 @@ function draw(prices, times, tf) {
 
 sel.onchange = () => load(sel.value);
 updatePrice();
-load('1d');
+load('7d'); // DEFAULT TO 7D ON LOAD
 setInterval(() => { updatePrice(); load(sel.value); }, 30000);
 </script>
 </body>
