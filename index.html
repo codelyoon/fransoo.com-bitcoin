@@ -38,101 +38,146 @@
 
 <script>
 // Static noise
-const s=document.getElementById('static'),ctx2=s.getContext('2d');
-s.width=innerWidth;s.height=innerHeight;
-window.addEventListener('resize',()=>{s.width=innerWidth;s.height=innerHeight});
-(function n(){const i=ctx2.createImageData(s.width,s.height),d=new Uint32Array(i.data.buffer);
-for(let j=0;j<d.length;j++)if(Math.random()<0.09)d[j]=0x33ffffff;ctx2.putImageData(i,0,0);requestAnimationFrame(n)})();
+const s = document.getElementById('static'), ctx2 = s.getContext('2d');
+s.width = innerWidth; s.height = innerHeight;
+window.addEventListener('resize', () => { s.width = innerWidth; s.height = innerHeight; });
+(function n() {
+  const img = ctx2.createImageData(s.width, s.height);
+  const buf = new Uint32Array(img.data.buffer);
+  for (let i = 0; i < buf.length; i++) if (Math.random() < 0.09) buf[i] = 0x33ffffff;
+  ctx2.putImageData(img, 0, 0);
+  requestAnimationFrame(n);
+})();
 
 // Typing intro
-const intro=`welcome to the fransoo.com finance portal
+const intro = `welcome to the fransoo.com finance portal
 
 here's the live BTC chart & price`;
-const t=document.getElementById('typing');
-let i=0;const ti=setInterval(()=>{if(i<intro.length){t.innerHTML+=intro[i]==='\n'?'<br>':intro[i];i++}else{clearInterval(ti);t.innerHTML+='<span class="cursor"></span>'}},45);
+const typing = document.getElementById('typing');
+let i = 0;
+const ti = setInterval(() => {
+  if (i < intro.length) { typing.innerHTML += intro[i] === '\n' ? '<br>' : intro[i]; i++; }
+  else { clearInterval(ti); typing.innerHTML += '<span class="cursor"></span>'; }
+}, 45);
 
 // Chart
-const canvas=document.getElementById('c'),ctx=canvas.getContext('2d');
-const price=document.getElementById('price'), sel=document.getElementById('tf');
+const canvas = document.getElementById('c'), ctx = canvas.getContext('2d');
+const priceEl = document.getElementById('price');
+const sel = document.getElementById('tf');
 
-function resize(){canvas.width=canvas.offsetWidth*devicePixelRatio;canvas.height=canvas.offsetHeight*devicePixelRatio;ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0)}
-window.addEventListener('resize',resize);resize();
+function resize() {
+  canvas.width = canvas.offsetWidth * devicePixelRatio;
+  canvas.height = canvas.offsetHeight * devicePixelRatio;
+  ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+}
+window.addEventListener('resize', resize);
+resize();
 
-async function updatePrice(){
-  try{
-    const r=await fetch('https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT');
-    const d=await r.json();
-    const p=+d.lastPrice, ch=+d.priceChangePercent;
-    price.innerHTML=`BTC $${p.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0})} <span class="${ch>=0?'up':'down'}">${ch>=0?'Up':'Down'}${Math.abs(ch).toFixed(2)}%</span>`;
-  }catch(e){price.textContent="BTC --"}
+async function updatePrice() {
+  try {
+    const r = await fetch('https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT');
+    const d = await r.json();
+    const p = +d.lastPrice, ch = +d.priceChangePercent;
+    priceEl.innerHTML = `BTC $${p.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0})} <span class="${ch>=0?'up':'down'}">${ch>=0?'Up':'Down'}${Math.abs(ch).toFixed(2)}%</span>`;
+  } catch { priceEl.textContent = "BTC --"; }
 }
 
-async function load(tf){
-  let intv, lim;
-  if(tf==='1h'){intv='1m';lim=60}
-  else if(tf==='1d'){intv='5m';lim=288}
-  else if(tf==='7d'){intv='1h';lim=168}
-  else if(tf==='30d'){intv='4h';lim=180}
-  else if(tf==='ytd'){intv='1d';lim=365}
-  else{intv='1w';lim=260}
+async function load(tf) {
+  let interval, limit;
+  if (tf === '1h')   { interval = '1m';  limit = 60; }
+  else if (tf === '1d')   { interval = '5m';  limit = 288; }
+  else if (tf === '7d')   { interval = '1h';  limit = 168; }
+  else if (tf === '30d')  { interval = '4h';  limit = 180; }
+  else if (tf === 'ytd')  { interval = '1d';  limit = 365; }
+  else                     { interval = '1w';  limit = 260; } // ALL
 
-  const r=await fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${intv}&limit=${lim}`);
-  const data=await r.json();
-  const prices=data.map(k=>+k[4]);
-  const times=data.map(k=>new Date(k[0]));
-  draw(prices,times,tf);
+  const r = await fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${interval}&limit=${limit}`);
+  const data = await r.json();
+  const prices = data.map(k => +k[4]);
+  const times = data.map(k => new Date(k[0]));
+  draw(prices, times, tf);
 }
 
-function draw(p,t,tf){
+function draw(prices, times, tf) {
   resize();
-  const W=canvas.width/devicePixelRatio, H=canvas.height/devicePixelRatio;
-  ctx.clearRect(0,0,W,H);
-  const pad=65, cw=W-2*pad, ch=H-2*pad;
-  const max=Math.max(...p), min=Math.min(...p), range=max-min||1;
+  const W = canvas.width / devicePixelRatio;
+  const H = canvas.height / devicePixelRatio;
+  ctx.clearRect(0, 0, W, H);
 
-  // Area
-  ctx.fillStyle='rgba(0,191,255,0.12)';
+  const pad = 65;
+  const cw = W - 2 * pad, ch = H - 2 * pad;
+  const max = Math.max(...prices), min = Math.min(...prices), range = max - min || 1;
+
+  // Area fill
+  ctx.fillStyle = 'rgba(0,191,255,0.12)';
   ctx.beginPath();
-  p.forEach((pr,i)=>{const x=pad+i*cw/(p.length-1), y=H-pad-((pr-min)/range)*ch; i===0?ctx.moveTo(x,y):ctx.lineTo(x,y)});
-  ctx.lineTo(W-pad,H-pad);ctx.lineTo(pad,H-pad);ctx.closePath();ctx.fill();
+  prices.forEach((p, i) => {
+    const x = pad + i * (cw / (prices.length - 1));
+    const y = H - pad - ((p - min) / range) * ch;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.lineTo(W - pad, H - pad);
+  ctx.lineTo(pad, H - pad);
+  ctx.closePath();
+  ctx.fill();
 
   // Line
-  ctx.strokeStyle='#00bfff';ctx.lineWidth=2.3;ctx.beginPath();
-  p.forEach((pr,i)=>{const x=pad+i*cw/(p.length-1), y=H-pad-((pr-min)/range)*ch; i===0?ctx.moveTo(x,y):ctx.lineTo(x,y)});
+  ctx.strokeStyle = '#00bfff';
+  ctx.lineWidth = 2.3;
+  ctx.beginPath();
+  prices.forEach((p, i) => {
+    const x = pad + i * (cw / (prices.length - 1));
+    const y = H - pad - ((p - min) / range) * ch;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
   ctx.stroke();
 
-  // Y grid + labels
-  ctx.strokeStyle='#003340';ctx.fillStyle='#00bfff';ctx.font='14px monospace';ctx.textAlign='right';
-  for(let i=0;i<=4;i++){
-    const y=pad+i*ch/4;
-    ctx.beginPath();ctx.moveTo(pad,y);ctx.lineTo(W-pad,y);ctx.stroke();
-    const val=max-i*range/4;
-    ctx.fillText('$'+val.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g,','),W-pad-10,y+6);
+  // Horizontal grid + Y labels
+  ctx.strokeStyle = '#003340';
+  ctx.fillStyle = '#00bfff';
+  ctx.font = '14px monospace';
+  ctx.textAlign = 'right';
+  for (let i = 0; i <= 4; i++) {
+    const y = pad + i * (ch / 4);
+    ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(W - pad, y); ctx.stroke();
+    const val = max - i * (range / 4);
+    ctx.fillText('$' + val.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ','), W - pad - 10, y + 6);
   }
 
-  // X labels — proper dates/times
-  ctx.textAlign='center';
-  const steps=6;
-  for(let i=0;i<=steps;i++){
-    const idx=Math.round(i*(p.length-1)/steps);
-    const x=pad+idx*cw/(p.length-1);
-    const d=t[idx];
-    let label;
-    if(tf==='1h') label=d.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}).replace(/:\d\d$/,'');
-    else if(tf==='1d') label=d.getHours()+'h';
-    else if(tf==='7d'||tf==='30d') label=d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
-    else label=d.toLocaleDateString('en-US',tf==='all'?{year:'numeric',month:'short'}:{month:'short',day:'numeric'});
-    ctx.fillText(label,x,H-pad+24);
+  // X-axis labels — PERFECT real dates/times
+  ctx.textAlign = 'center';
+  const labelsCount = 6;
+  for (let i = 0; i <= labelsCount; i++) {
+    const idx = Math.round(i * (prices.length - 1) / labelsCount);
+    const x = pad + idx * cw / (prices.length - 1);
+    const date = times[idx];
+
+    let label = '';
+    if (tf === '1h') {
+      label = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }).replace(/AM|PM/, '');
+    } else if (tf === '1d') {
+      label = date.getHours().toString().padStart(2, '0') + 'h';
+    } else if (tf === '7d' || tf === '30d') {
+      label = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    } else if (tf === 'ytd') {
+      label = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    } else { // ALL
+      label = date.getFullYear();
+    }
+
+    ctx.fillText(label, x, H - pad + 24);
   }
 
   // Border
-  ctx.strokeStyle='#00bfff';ctx.lineWidth=1.5;ctx.strokeRect(pad,pad,cw,ch);
+  ctx.strokeStyle = '#00bfff';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(pad, pad, cw, ch);
 }
 
-sel.onchange=()=>load(sel.value);
+sel.onchange = () => load(sel.value);
 updatePrice();
 load('1d');
-setInterval(()=>{updatePrice();load(sel.value)},30000);
+setInterval(() => { updatePrice(); load(sel.value); }, 30000);
 </script>
 </body>
 </html>
