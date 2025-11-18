@@ -7,26 +7,34 @@
 <style>
   body{background:#000;color:#00bfff;font-family:'Courier New',monospace;margin:0;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;overflow:hidden}
   #static{position:absolute;inset:0;opacity:0.15;pointer-events:none;z-index:1}
-  .container{z-index:2;text-align:center;padding:20px;width:100%;max-width:1000px;box-sizing:border-box}
-  .typing{font-size:20px;white-space:pre-line}
-  .cursor{display:inline-block;width:10px;height:22px;background:#00bfff;animation:b 1s infinite}
+  .container{z-index:2;width:100%;max-width:1200px;padding:10px;box-sizing:border-box;display:flex;flex-direction:column;align-items:center}
+  .typing{font-size:clamp(16px, 4vw, 22px);white-space:pre-line;text-align:center;margin-bottom:10px}
+  .cursor{display:inline-block;width:10px;height:1.2em;background:#00bfff;animation:b 1s infinite;vertical-align:middle}
   @keyframes b{0%,50%{opacity:1}51%,100%{opacity:0}}
-  #price-live{position:absolute;top:8px;left:50%;transform:translateX(-50%);font-size:32px;font-weight:bold;z-index:10;letter-spacing:1px;text-shadow:0 0 10px #00bfff}
+  
+  #price-live{font-size:clamp(28px, 7vw, 38px);font-weight:bold;margin:10px 0 5px;z-index:10;letter-spacing:1px;text-shadow:0 0 15px #00bfff}
   .up{color:#0f8}.down{color:#f44}
-  #chart-container{position:relative;margin-top:60px;width:100%;height:60vh;border:1px solid #00bfff}
-  canvas{width:100%;height:100%;display:block}
-  select{position:absolute;top:-45px;left:12px;z-index:3;background:#000;border:1px solid #00bfff;color:#00bfff;padding:8px 16px;font-size:15px;font-family:inherit}
-  #change{font-size:19px;margin-top:12px;opacity:0.9;font-weight:bold}
+  
+  #header{display:flex;justify-content:space-between;align-items:center;width:100%;max-width:1100px;padding:0 15px;box-sizing:border-box}
+  select{background:#000;border:1px solid #00bfff;color:#00bfff;padding:10px 16px;font-size:16px;font-family:inherit;border-radius:6px}
+  
+  #chart-container{position:relative;width:100%;max-width:1100px;height:60vh;border:1px solid #00bfff;margin:10px 0;background:#000}
+  canvas{width:100%!important;height:100%!important;display:block}
+  
+  #change{font-size:clamp(16px, 4vw, 20px);margin-top:8px;font-weight:bold}
+  
+  @media (max-width: 768px) {
+    #header{flex-direction:column;gap:10px}
+    select{width:100%;max-width:300px}
+    #chart-container{height:55vh}
+  }
 </style>
 </head>
 <body>
 <canvas id="static"></canvas>
 
-<div id="price-live">BTC $--.---</div>
-
 <div class="container">
-  <div class="typing" id="typing"></div>
-  <div id="chart-container">
+  <div id="header">
     <select id="tf">
       <option value="1h">1H</option>
       <option value="1d">1D</option>
@@ -35,8 +43,15 @@
       <option value="ytd">YTD</option>
       <option value="all">ALL</option>
     </select>
+  </div>
+
+  <div class="typing" id="typing"></div>
+  <div id="price-live">BTC $--.---</div>
+
+  <div id="chart-container">
     <canvas id="c"></canvas>
   </div>
+  
   <div id="change"></div>
 </div>
 
@@ -103,7 +118,6 @@ async function load(tf) {
   const prices = data.map(k => +k[4]);
   const times = data.map(k => new Date(k[0]));
 
-  // Timeframe % change
   const first = prices[0], last = prices[prices.length - 1];
   const change = ((last - first) / first) * 100;
   const tfName = sel.options[sel.selectedIndex].text;
@@ -118,25 +132,27 @@ function draw(prices, times, tf) {
   const H = canvas.height / devicePixelRatio;
   ctx.clearRect(0, 0, W, H);
 
-  const pad = 65;
-  const cw = W - 2 * pad, ch = H - 2 * pad;
+  const padX = 70;
+  const padY = 50;
+  const cw = W - padX - 100;  // Extra space on right for price labels
+  const ch = H - 2 * padY;
   const max = Math.max(...prices), min = Math.min(...prices), range = max - min || 1;
 
   // Area fill
   ctx.fillStyle = 'rgba(0,191,255,0.12)';
   ctx.beginPath();
   prices.forEach((p, i) => {
-    const x = pad + i * cw / (prices.length - 1);
-    const y = H - pad - ((p - min) / range) * ch;
+    const x = padX + i * cw / (prices.length - 1);
+    const y = H - padY - ((p - min) / range) * ch;
     i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
   });
-  ctx.lineTo(W - pad, H - pad); ctx.lineTo(pad, H - pad); ctx.closePath(); ctx.fill();
+  ctx.lineTo(W - 100, H - padY); ctx.lineTo(padX, H - padY); ctx.closePath(); ctx.fill();
 
   // Line
-  ctx.strokeStyle = '#00bfff'; ctx.lineWidth = 2.3; ctx.beginPath();
+  ctx.strokeStyle = '#00bfff'; ctx.lineWidth = 2.5; ctx.beginPath();
   prices.forEach((p, i) => {
-    const x = pad + i * cw / (prices.length - 1);
-    const y = H - pad - ((p - min) / range) * ch;
+    const x = padX + i * cw / (prices.length - 1);
+    const y = H - padY - ((p - min) / range) * ch;
     i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
   });
   ctx.stroke();
@@ -144,16 +160,16 @@ function draw(prices, times, tf) {
   // Horizontal grid
   ctx.strokeStyle = '#003340';
   for (let i = 0; i <= 4; i++) {
-    const y = pad + i * (ch / 4);
-    ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(W - pad, y); ctx.stroke();
+    const y = padY + i * (ch / 4);
+    ctx.beginPath(); ctx.moveTo(padX, y); ctx.lineTo(W - 100, y); ctx.stroke();
   }
 
-  // Y-axis labels — NOW OUTSIDE ON THE RIGHT
+  // Y-axis labels — OUTSIDE, FULLY VISIBLE
   ctx.fillStyle = '#00bfff'; ctx.font = '14px monospace'; ctx.textAlign = 'left';
   for (let i = 0; i <= 4; i++) {
-    const y = pad + i * (ch / 4);
+    const y = padY + i * (ch / 4);
     const val = max - i * (range / 4);
-    ctx.fillText('$' + val.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ','), W - pad + 8, y + 6);
+    ctx.fillText('$' + val.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ','), W - 95, y + 6);
   }
 
   // X-axis labels
@@ -161,7 +177,7 @@ function draw(prices, times, tf) {
   const count = 6;
   for (let i = 0; i <= count; i++) {
     const idx = Math.round(i * (prices.length - 1) / count);
-    const x = pad + idx * cw / (prices.length - 1);
+    const x = padX + idx * cw / (prices.length - 1);
     const d = times[idx];
     let label = '';
     if (tf === '1h') label = d.toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit'}).replace(/:\d\d$/,'');
@@ -169,17 +185,17 @@ function draw(prices, times, tf) {
     else if (tf === '7d' || tf === '30d') label = d.toLocaleDateString('en-US', {month:'short', day:'numeric'});
     else if (tf === 'ytd') label = d.toLocaleDateString('en-US', {month:'short', day:'numeric'});
     else label = d.getFullYear();
-    ctx.fillText(label, x, H - pad + 24);
+    ctx.fillText(label, x, H - padY + 28);
   }
 
   // Border
   ctx.strokeStyle = '#00bfff'; ctx.lineWidth = 1.5;
-  ctx.strokeRect(pad, pad, cw, ch);
+  ctx.strokeRect(padX, padY, cw, ch);
 }
 
 sel.onchange = () => load(sel.value);
 updatePrice();
-load('7d'); // Default 7D
+load('7d');
 setInterval(() => { updatePrice(); load(sel.value); }, 30000);
 </script>
 </body>
