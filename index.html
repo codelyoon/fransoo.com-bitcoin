@@ -16,8 +16,7 @@
     .down {color:#ff0044}
     #chart-container {margin-top:30px;width:100%;height:60vh;background:#000;border:1px solid #00bfff;position:relative}
     canvas#chart {width:100%;height:100%;display:block}
-    #timeframe-select {position:absolute;top:10px;left:10px;z-index:3;background:#000;border:1px solid #00bfff;color:#00bfff;padding:8px 12px;font-family:'Courier New',monospace;font-size:14px}
-    #timeframe-select option {background:#000;color:#00bfff}
+    #timeframe-select {position:absolute;top:12px;left:12px;z-index:3;background:#000;border:1px solid #00bfff;color:#00bfff;padding:8px 14px;font-size:15px;border-radius:4px}
   </style>
 </head>
 <body>
@@ -54,125 +53,121 @@ here's the live BTC chart & price`;
     function type(t,e,cb){let i=0;const x=setInterval(()=>{if(i<t.length){e.innerHTML+=t[i]==='\n'?'<br>':t[i];i++}else{clearInterval(x);cb&&cb()}},45);}
     type(intro, typingEl, () => typingEl.innerHTML += '<span class="cursor"></span>');
 
-    const chartCanvas = document.getElementById('chart');
-    const ctx = chartCanvas.getContext('2d');
+    const canvas = document.getElementById('chart');
+    const ctx = canvas.getContext('2d');
     const priceBox = document.getElementById('price-box');
     const select = document.getElementById('timeframe-select');
 
     function resize() {
-      chartCanvas.width = chartCanvas.offsetWidth * devicePixelRatio;
-      chartCanvas.height = chartCanvas.offsetHeight * devicePixelRatio;
+      canvas.width = canvas.offsetWidth * devicePixelRatio;
+      canvas.height = canvas.offsetHeight * devicePixelRatio;
       ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
     }
     window.addEventListener('resize', resize);
     resize();
 
-    let currentPrice = 0, change24h = 0;
-
     async function updatePrice() {
       const r = await fetch('https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT');
       const d = await r.json();
-      currentPrice = parseFloat(d.lastPrice);
-      change24h = parseFloat(d.priceChangePercent);
-      priceBox.innerHTML = `BTC $${currentPrice.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0})} 
-        <span class="${change24h>=0?'up':'down'}">${change24h>=0?'↑':'↓'}${Math.abs(change24h).toFixed(2)}%</span>`;
+      const p = parseFloat(d.lastPrice);
+      const c = parseFloat(d.priceChangePercent);
+      priceBox.innerHTML = `BTC $${p.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0})} 
+        <span class="${c>=0?'up':'down'}">${c>=0?'Up':'Down'}${Math.abs(c).toFixed(2)}%</span>`;
     }
 
     async function loadChart(tf) {
       let interval, limit;
       if (tf==='1h')   { interval='1m'; limit=60; }
-      if (tf==='1d')   { interval='1h'; limit=24; }
+      if (tf==='1d')   { interval='1h'; limit=25; }
       if (tf==='7d')   { interval='4h'; limit=42; }
       if (tf==='30d')  { interval='1d'; limit=30; }
       if (tf==='ytd')  { interval='1d'; limit=365; }
       if (tf==='all')  { interval='1d'; limit=2500; }
 
       const r = await fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${interval}&limit=${limit}`);
-      const data = await r.json();
+      const klines = await r.json();
 
-      const prices = data.map(k => parseFloat(k[4]));
-      const times = data.map(k => new Date(k[0]));
+      const prices = klines.map(k => parseFloat(k[4])); // close
+      const timestamps = klines.map(k => new Date(k[0]));
 
-      draw(prices, times, tf);
+      drawChart(prices, timestamps, tf);
     }
 
-    function draw(prices, times, tf) {
+    function drawChart(prices, times, tf) {
       resize();
-      const w = chartCanvas.width / devicePixelRatio;
-      const h = chartCanvas.height / devicePixelRatio;
+      const w = canvas.width / devicePixelRatio;
+      const h = canvas.height / devicePixelRatio;
       ctx.clearRect(0,0,w,h);
 
       const pad = 60;
-      const chartW = w - 2*pad;
-      const chartH = h - 2*pad;
+      const cw = w - 2*pad;
+      const ch = h - 2*pad;
 
       const maxP = Math.max(...prices);
       const minP = Math.min(...prices);
       const range = maxP - minP || 1;
 
-      // Fill
-      ctx.fillStyle = 'rgba(0,191,255,0.08)';
+      // Fill area
+      ctx.fillStyle = 'rgba(0,191,255,0.1)';
       ctx.beginPath();
-      ctx.moveTo(pad, h-pad);
       prices.forEach((p,i) => {
-        const x = pad + (i/(prices.length-1))*chartW;
-        const y = h-pad - ((p-minP)/range)*chartH;
-        ctx.lineTo(x,y);
+        const x = pad + (i/(prices.length-1)) * cw;
+        const y = h - pad - ((p - minP)/range) * ch;
+        i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
       });
       ctx.lineTo(w-pad, h-pad);
+      ctx.lineTo(pad, h-pad);
       ctx.closePath();
       ctx.fill();
 
       // Line
       ctx.strokeStyle = '#00bfff';
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 2.2;
       ctx.beginPath();
       prices.forEach((p,i) => {
-        const x = pad + (i/(prices.length-1))*chartW;
-        const y = h-pad - ((p-minP)/range)*chartH;
+        const x = pad + (i/(prices.length-1)) * cw;
+        const y = h - pad - ((p - minP)/range) * ch;
         i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
       });
       ctx.stroke();
 
-      // Grid + Y labels
+      // Horizontal grid + Y labels
       ctx.strokeStyle = '#003340';
       ctx.lineWidth = 1;
       ctx.fillStyle = '#00bfff';
       ctx.font = '14px monospace';
       ctx.textAlign = 'right';
       for(let i=0;i<=4;i++){
-        const y = pad + i*(chartH/4);
-        ctx.beginPath();
-        ctx.moveTo(pad,y);
-        ctx.lineTo(w-pad,y);
-        ctx.stroke();
-
-        const priceVal = maxP - (i*(range/4));
-        ctx.fillText(`$${priceVal.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`, w-pad-8, y+5);
+        const y = pad + i*(ch/4);
+        ctx.beginPath(); ctx.moveTo(pad,y); ctx.lineTo(w-pad,y); ctx.stroke();
+        const val = maxP - i*(range/4);
+        ctx.fillText(`$${val.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g,",")}`, w-pad-8, y+5);
       }
 
-      // X labels
+      // X-axis labels — REAL time that makes sense
       ctx.textAlign = 'center';
       const steps = 5;
       for(let i=0;i<=steps;i++){
-        const idx = Math.round(i*(prices.length-1)/steps);
-        const x = pad + idx*chartW/(prices.length-1);
+        const idx = Math.round(i * (prices.length-1) / steps);
+        const x = pad + idx * cw / (prices.length-1);
+        const t = times[idx];
+
         let label;
-        if(tf==='1h') label = `${60-i*12}m`;
-        else if(tf==='1d') label = `${24-i*6}h`;
-        else if(tf==='7d') label = `${7-i}D`;
-        else if(tf==='30d') label = `${30-6*i}D`;
-        else {
-          const date = times[idx];
-          label = tf==='all' ? date.getFullYear() : `${date.toLocaleDateString('en-US',{month:'short',day:'numeric'})}`;
+        if (tf==='1h')   label = idx===0 ? 'now' : `${60-Math.round(idx)}m`;
+        else if (tf==='1d')  label = idx===0 ? 'now' : `${24-idx}h`;
+        else if (tf==='7d')  label = idx===0 ? 'now' : `${7-Math.round(idx/10.5)}D`;
+        else if (tf==='30d') label = idx===0 ? 'now' : `${30-Math.round(idx)}D`;
+        else if (tf==='ytd' || tf==='all') {
+          label = t.toLocaleDateString('en-US', tf==='all' ? {year:'numeric'} : {month:'short', day:'numeric'});
         }
-        ctx.fillText(label, x, h-pad+20);
+
+        ctx.fillText(label, x, h-pad+22);
       }
 
       // Border
       ctx.strokeStyle = '#00bfff';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(pad, pad, chartW, chartH);
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(pad, pad, cw, ch);
     }
 
     select.addEventListener('change', () => loadChart(select.value));
