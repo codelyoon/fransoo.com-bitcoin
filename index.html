@@ -6,7 +6,7 @@
 <title>fransoo.com | Crypto Portal</title>
 <style>
   body{background:#000;color:#00bfff;font-family:'Courier New',monospace;margin:0;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;overflow:hidden}
-  #static{position:absolute;inset:0;opacity:0.65;pointer-events:none;z-index:1}
+  #static{position:absolute;inset:0;opacity:0.15;pointer-events:none;z-index:1}
   .container{z-index:2;width:100%;max-width:1100px;padding:10px;box-sizing:border-box;display:flex;flex-direction:column;align-items:center}
   .typing{font-size:clamp(16px,4vw,22px);white-space:pre-line;text-align:center;margin-bottom:8px}
   .cursor{display:inline-block;width:10px;height:1.2em;background:#00bfff;animation:b 1s infinite;vertical-align:middle}
@@ -195,42 +195,44 @@ function drawChart(prices, times, tf, dotColor = '#00bfff'){
   ctx.clearRect(0,0,W,H);
   if(prices.length < 2) return;
 
-  const padX=70, padY=50, cw=W-padX-110, ch=H-2*padY;
+  const padX=70, padY=50, chartWidth=W-padX-10, chartHeight=H-2*padY;
   const max=Math.max(...prices), min=Math.min(...prices), range=max-min||1;
 
   // Area fill
   ctx.fillStyle='rgba(0,191,255,0.12)';
   ctx.beginPath();
-  prices.forEach((p,i)=>{const x=padX+i*(cw/(prices.length-1));
-    const y=H-padY-((p-min)/range)*ch;
+  prices.forEach((p,i)=>{const x=padX+i*(chartWidth/(prices.length-1));
+    const y=H-padY-((p-min)/range)*chartHeight;
     i===0?ctx.moveTo(x,y):ctx.lineTo(x,y)});
-  ctx.lineTo(W-110,H-padY);ctx.lineTo(padX,H-padY);ctx.closePath();ctx.fill();
+  ctx.lineTo(W-10,H-padY);ctx.lineTo(padX,H-padY);ctx.closePath();ctx.fill();
 
   // Line
   ctx.strokeStyle='#00bfff';ctx.lineWidth=2.5;ctx.beginPath();
-  prices.forEach((p,i)=>{const x=padX+i*(cw/(prices.length-1));
-    const y=H-padY-((p-min)/range)*ch;
+  prices.forEach((p,i)=>{const x=padX+i*(chartWidth/(prices.length-1));
+    const y=H-padY-((p-min)/range)*chartHeight;
     i===0?ctx.moveTo(x,y):ctx.lineTo(x,y)});
   ctx.stroke();
 
   // Pulsing dot
-  const lastX = padX + (prices.length-1)*(cw/(prices.length-1));
-  const lastY = H-padY-((prices[prices.length-1]-min)/range)*ch;
+  const lastX = padX + (prices.length-1)*(chartWidth/(prices.length-1));
+  const lastY = H-padY-((prices[prices.length-1]-min)/range)*chartHeight;
   ctx.fillStyle = dotColor;
   ctx.beginPath(); ctx.arc(lastX, lastY, 7, 0, Math.PI*2); ctx.fill();
   ctx.strokeStyle = '#00bfff'; ctx.lineWidth = 2; ctx.stroke();
 
-  // PRICE AXIS — FIXED & ALWAYS VISIBLE
+  // Horizontal grid lines
   ctx.strokeStyle='#003340';
   for(let i=0;i<=5;i++){
-    const y = padY + i*(ch/5);
-    ctx.beginPath(); ctx.moveTo(padX,y); ctx.lineTo(W-110,y); ctx.stroke();
+    const y = padY + i*(chartHeight/5);
+    ctx.beginPath(); ctx.moveTo(padX,y); ctx.lineTo(W-10,y); ctx.stroke();
   }
+
+  // PRICE AXIS — NOW ON THE RIGHT OUTER BORDER
   ctx.fillStyle='#00bfff'; ctx.font='14px monospace'; ctx.textAlign='right';
   for(let i=0;i<=5;i++){
     const val = max - i*(range/5);
-    const y = padY + i*(ch/5);
-    ctx.fillText('$' + val.toFixed(val > 1000 ? 0 : 2).replace(/\B(?=(\d{3})+(?!\d))/g, ','), W-120, y + 6);
+    const y = padY + i*(chartHeight/5);
+    ctx.fillText('$' + val.toFixed(val > 1000 ? 0 : 2).replace(/\B(?=(\d{3})+(?!\d))/g, ','), W-18, y + 6);
   }
 
   // Time labels (disabled in LIVE)
@@ -239,7 +241,7 @@ function drawChart(prices, times, tf, dotColor = '#00bfff'){
     const count = innerWidth<=768?4:6;
     for(let i=0;i<=count;i++){
       const idx=Math.round(i*(prices.length-1)/count);
-      const x=padX+idx*(cw/(prices.length-1));
+      const x=padX+idx*(chartWidth/(prices.length-1));
       const d=times[idx];
       let label = tf==='1h' ? d.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}).replace(/:\d\d$/,'') :
                   tf==='1d' ? d.getHours()+'h' :
@@ -249,8 +251,9 @@ function drawChart(prices, times, tf, dotColor = '#00bfff'){
     }
   }
 
+  // Border
   ctx.strokeStyle='#00bfff';ctx.lineWidth=1.5;
-  ctx.strokeRect(padX,padY,cw,ch);
+  ctx.strokeRect(padX,padY,chartWidth,chartHeight);
 }
 
 // Events
