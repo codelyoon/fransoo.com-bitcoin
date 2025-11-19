@@ -15,7 +15,9 @@
   #price-box{display:flex;align-items:center;gap:15px;font-size:clamp(30px,8vw,42px);font-weight:bold;z-index:10;text-shadow:0 0 15px #00bfff;position:relative}
   #coin-display{font-weight:bold;color:#00bfff}
   #coin-select{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
-  .price{font-size:inherit}
+  #price-live{transition:background 0.4s}
+  .pulse-green{background:rgba(0,255,0,0.3)!important}
+  .pulse-red{background:rgba(255,0,0,0.3)!important}
   .up{color:#0f8}.down{color:#f44}
   
   #chart-container{position:relative;width:100%;max-width:1100px;height:60vh;border:1px solid #00bfff;background:#000;margin:10px 0}
@@ -68,7 +70,6 @@ let i=0;
 const ti=setInterval(()=>{if(i<intro.length){typing.innerHTML+=intro[i]==='\n'?'<br>':intro[i];i++}
 else{clearInterval(ti);typing.innerHTML+='<span class="cursor"></span>'}},45);
 
-// Elements
 const canvas=document.getElementById('c'),ctx=canvas.getContext('2d');
 const priceLive=document.getElementById('price-live');
 const changeEl=document.getElementById('change');
@@ -78,6 +79,7 @@ const tfSel=document.getElementById('tf-select');
 
 let currentSymbol = 'BTCUSDT';
 let currentName = 'BTC';
+let lastPrice = 0;
 
 const top30 = [
   {s:'BTCUSDT',n:'BTC'},{s:'ETHUSDT',n:'ETH'},{s:'BNBUSDT',n:'BNB'},{s:'SOLUSDT',n:'SOL'},
@@ -97,42 +99,43 @@ function resize(){
 }
 window.addEventListener('resize',resize);resize();
 
-// Safe fetch with fallback
 async function safeFetch(url){
   try{
     const r = await fetch(url,{cache:"no-store"});
-    if(!r.ok) throw new Error();
+    if(!r.ok) return null;
     return await r.json();
-  }catch(e){
-    console.log("API down, retrying...");
-    return null;
-  }
+  }catch{return null}
 }
 
-// Populate dropdown + cache 24h %
-async function loadDropdown(){
-  coinSel.innerHTML = '';
-  for(const coin of top30){
+// Silent dropdown update every 60s
+async function updateDropdown(){
+  for(let i=0;i<top30.length;i++){
+    const coin = top30[i];
     const data = await safeFetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${coin.s}`);
-    const change = data ? +data.priceChangePercent : 0;
-    const opt = document.createElement('option');
-    opt.value = coin.s;
-    opt.textContent = `${coin.n} ${change>=0?'Up':'Down'} ${Math.abs(change).toFixed(2)}%`;
-    if(coin.s===currentSymbol) opt.selected = true;
-    coinSel.appendChild(opt);
+    if(data){
+      const change = +data.priceChangePercent;
+      coinSel.options[i].textContent = `${coin.n} ${change>=0?'Up':'Down'} ${Math.abs(change).toFixed(2)}%`;
+    }
   }
 }
 
-// Price update
+// Live price + pulse (every 3s)
 async function updatePrice(){
   const data = await safeFetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${currentSymbol}`);
-  if(!data){
-    priceLive.textContent = "Offline";
-    return;
-  }
-  const p = +data.lastPrice;
+  if(!data) return;
+  
+  const price = +data.lastPrice;
   const ch = +data.priceChangePercent;
-  priceLive.innerHTML = `$${p.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})} <span class="${ch>=0?'up':'down'}">${ch>=0?'+' : 'Minus'}${Math.abs(ch).toFixed(2)}%</span>`;
+
+  // Pulse effect
+  if(lastPrice !== 0){
+    if(price > lastPrice) priceLive.classList.add('pulse-green');
+    else if(price < lastPrice) priceLive.classList.add('pulse-red');
+    setTimeout(()=>priceLive.classList.remove('pulse-green','pulse-red'),500);
+  }
+  lastPrice = price;
+
+  priceLive.innerHTML = `$${price.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})} <span class="${ch>=0?'up':'down'}">${ch>=0?'+' : '-'} ${Math.abs(ch).toFixed(2)}%</span>`;
 }
 
 // Chart
@@ -146,17 +149,14 @@ async function loadChart(tf){
   else{interval='1w';limit=1000}
 
   const data = await safeFetch(`https://api.binance.com/api/v3/klines?symbol=${currentSymbol}&interval=${interval}&limit=${limit}`);
-  if(!data || data.length<2){
-    changeEl.textContent = "No data";
-    return;
-  }
+  if(!data || data.length<2) return;
 
   const prices = data.map(k=>+k[4]);
   const times = data.map(k=>new Date(k[0]));
   const first=prices[0], last=prices[prices.length-1];
   const change = ((last-first)/first)*100;
   const tfName = tfSel.options[tfSel.selectedIndex].text;
-  changeEl.innerHTML = `<span class="${change>=0?'up':'down'}">${change>=0?'+' : 'Minus'}${Math.abs(change).toFixed(2)}%</span> (${tfName})`;
+  changeEl.innerHTML = `<span class="${change>=0?'up':'down'}">${change>=0?'+' : '-'} ${Math.abs(change).toFixed(2)}%</span> (${tfName})`;
 
   drawChart(prices, times, tf);
 }
@@ -169,7 +169,6 @@ function drawChart(prices, times, tf){
   const padX=70, padY=50, cw=W-padX-110, ch=H-2*padY;
   const max=Math.max(...prices), min=Math.min(...prices), range=max-min||1;
 
-  // Area fill
   ctx.fillStyle='rgba(0,191,255,0.12)';
   ctx.beginPath();
   prices.forEach((p,i)=>{const x=padX+i*(cw/(prices.length-1));
@@ -177,14 +176,12 @@ function drawChart(prices, times, tf){
     i===0?ctx.moveTo(x,y):ctx.lineTo(x,y)});
   ctx.lineTo(W-110,H-padY);ctx.lineTo(padX,H-padY);ctx.closePath();ctx.fill();
 
-  // Line
   ctx.strokeStyle='#00bfff';ctx.lineWidth=2.5;ctx.beginPath();
   prices.forEach((p,i)=>{const x=padX+i*(cw/(prices.length-1));
     const y=H-padY-((p-min)/range)*ch;
     i===0?ctx.moveTo(x,y):ctx.lineTo(x,y)});
   ctx.stroke();
 
-  // Grid + labels (same as before)
   ctx.strokeStyle='#003340';
   for(let i=0;i<=4;i++){
     const y=padY+i*(ch/4);
@@ -196,7 +193,6 @@ function drawChart(prices, times, tf){
     ctx.fillText('$'+val.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g,','),W-105,padY+i*(ch/4)+6);
   }
 
-  // X labels
   ctx.textAlign='center';
   const count = innerWidth<=768?4:6;
   for(let i=0;i<=count;i++){
@@ -222,23 +218,35 @@ coinSel.onchange = () => {
   currentSymbol = coinSel.value;
   currentName = opt.textContent.split(' ')[0];
   coinDisplay.textContent = currentName;
+  lastPrice = 0;
   updatePrice();
   loadChart(tfSel.value);
 };
 tfSel.onchange = () => loadChart(tfSel.value);
 
-// Start everything
-loadDropdown().then(() => {
-  coinDisplay.textContent = currentName;
-  updatePrice();
-  loadChart('7d');
-});
+// Init dropdown
+async function initDropdown(){
+  coinSel.innerHTML = '';
+  for(const coin of top30){
+    const opt = document.createElement('option');
+    opt.value = coin.s;
+    opt.textContent = `${coin.n} Loading...`;
+    if(coin.s===currentSymbol) opt.selected = true;
+    coinSel.appendChild(opt);
+  }
+  updateDropdown();
+}
 
-setInterval(()=>{
-  updatePrice();
-  loadChart(tfSel.value);
-  loadDropdown();
-}, 30000);
+// Start
+initDropdown();
+updatePrice();
+loadChart('7d');
+
+// Updates
+setInterval(updatePrice, 3000);        // Price + pulse every 3s
+setInterval(updateDropdown, 60000);    // Dropdown % every 60s
+setInterval(() => loadChart(tfSel.value), 300000); // Chart every 5min (smooth)
+
 </script>
 </body>
 </html>
