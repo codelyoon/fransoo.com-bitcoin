@@ -6,29 +6,15 @@
 <title>fransoo.com | Crypto Portal</title>
 <style>
   body{background:#000;color:#00bfff;font-family:'Courier New',monospace;margin:0;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;overflow:hidden}
-  #static{position:absolute;inset:0;opacity:0.15;pointer-events:none;z-index:1}
+  #static{position:absolute;inset:0;opacity:0.55;pointer-events:none;z-index:1}
   .container{z-index:2;width:100%;max-width:1100px;padding:10px;box-sizing:border-box;display:flex;flex-direction:column;align-items:center}
   .typing{font-size:clamp(16px,4vw,22px);white-space:pre-line;text-align:center;margin-bottom:8px}
   .cursor{display:inline-block;width:10px;height:1.2em;background:#00bfff;animation:b 1s infinite;vertical-align:middle}
   @keyframes b{0%,50%{opacity:1}51%,100%{opacity:0}}
   
-  #price-box{display:flex;align-items:center;gap:15px;font-size:clamp(30px,8vw,42px);font-weight:bold;z-index:10;text-shadow:0 0 15px #00bfff}
-  #coin-select{
-    background:transparent;
-    border:none;
-    color:#00bfff;
-    font-size:inherit;
-    font-family:inherit;
-    font-weight:bold;
-    cursor:pointer;
-    outline:none;
-    appearance:none;
-    -webkit-appearance:none;
-    padding-right:35px;
-    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='%2300bfff'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
-    background-repeat:no-repeat;
-    background-position:right center;
-  }
+  #price-box{display:flex;align-items:center;gap:15px;font-size:clamp(30px,8vw,42px);font-weight:bold;z-index:10;text-shadow:0 0 15px #00bfff;position:relative}
+  #coin-display{font-weight:bold;color:#00bfff}
+  #coin-select{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
   .price{font-size:inherit}
   .up{color:#0f8}.down{color:#f44}
   
@@ -45,8 +31,9 @@
   <div class="typing" id="typing"></div>
   
   <div id="price-box">
+    <div id="coin-display">BTC</div>
     <select id="coin-select"></select>
-    <span id="price-live">$--.---</span>
+    <span id="price-live">Loading...</span>
   </div>
 
   <div id="chart-container">
@@ -61,7 +48,7 @@
     <canvas id="c"></canvas>
   </div>
   
-  <div id="change"></div>
+  <div id="change">Loading...</div>
 </div>
 
 <script>
@@ -85,25 +72,23 @@ else{clearInterval(ti);typing.innerHTML+='<span class="cursor"></span>'}},45);
 const canvas=document.getElementById('c'),ctx=canvas.getContext('2d');
 const priceLive=document.getElementById('price-live');
 const changeEl=document.getElementById('change');
+const coinDisplay=document.getElementById('coin-display');
 const coinSel=document.getElementById('coin-select');
 const tfSel=document.getElementById('tf-select');
+
 let currentSymbol = 'BTCUSDT';
 let currentName = 'BTC';
 
 const top30 = [
-  {s:'BTCUSDT', n:'BTC'}, {s:'ETHUSDT', n:'ETH'}, {s:'BNBUSDT', n:'BNB'},
-  {s:'SOLUSDT', n:'SOL'}, {s:'XRPUSDT', n:'XRP'}, {s:'ADAUSDT', n:'ADA'},
-  {s:'DOGEUSDT', n:'DOGE'}, {s:'TRXUSDT', n:'TRX'}, {s:'AVAXUSDT', n:'AVAX'},
-  {s:'SHIBUSDT', n:'SHIB'}, {s:'LINKUSDT', n:'LINK'}, {s:'DOTUSDT', n:'DOT'},
-  {s:'LTCUSDT', n:'LTC'}, {s:'BCHUSDT', n:'BCH'}, {s:'NEARUSDT', n:'NEAR'},
-  {s:'HBARUSDT', n:'HBAR'}, {s:'MATICUSDT', n:'MATIC'}, {s:'UNIUSDT', n:'UNI'},
-  {s:'ICPUSDT', n:'ICP'}, {s:'APTUSDT', n:'APT'}, {s:'CROUSDT', n:'CRO'},
-  {s:'XLMUSDT', n:'XLM'}, {s:'VETUSDT', n:'VET'}, {s:'FILUSDT', n:'FIL'},
-  {s:'KASUSDT', n:'KAS'}, {s:'ATOMUSDT', n:'ATOM'}, {s:'STXUSDT', n:'STX'},
-  {s:'ARBUSDT', n:'ARB'}, {s:'IMXUSDT', n:'IMX'}, {s:'SUIUSDT', n:'SUI'}
+  {s:'BTCUSDT',n:'BTC'},{s:'ETHUSDT',n:'ETH'},{s:'BNBUSDT',n:'BNB'},{s:'SOLUSDT',n:'SOL'},
+  {s:'XRPUSDT',n:'XRP'},{s:'ADAUSDT',n:'ADA'},{s:'DOGEUSDT',n:'DOGE'},{s:'TRXUSDT',n:'TRX'},
+  {s:'AVAXUSDT',n:'AVAX'},{s:'SHIBUSDT',n:'SHIB'},{s:'LINKUSDT',n:'LINK'},{s:'DOTUSDT',n:'DOT'},
+  {s:'LTCUSDT',n:'LTC'},{s:'BCHUSDT',n:'BCH'},{s:'NEARUSDT',n:'NEAR'},{s:'HBARUSDT',n:'HBAR'},
+  {s:'MATICUSDT',n:'MATIC'},{s:'UNIUSDT',n:'UNI'},{s:'ICPUSDT',n:'ICP'},{s:'APTUSDT',n:'APT'},
+  {s:'CROUSDT',n:'CRO'},{s:'XLMUSDT',n:'XLM'},{s:'VETUSDT',n:'VET'},{s:'FILUSDT',n:'FIL'},
+  {s:'KASUSDT',n:'KAS'},{s:'ATOMUSDT',n:'ATOM'},{s:'STXUSDT',n:'STX'},{s:'ARBUSDT',n:'ARB'},
+  {s:'IMXUSDT',n:'IMX'},{s:'SUIUSDT',n:'SUI'}
 ];
-
-let priceCache = {};
 
 function resize(){
   canvas.width=canvas.offsetWidth*devicePixelRatio;
@@ -112,70 +97,47 @@ function resize(){
 }
 window.addEventListener('resize',resize);resize();
 
-async function fetchTop30Data(){
-  const promises = top30.map(c => fetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${c.s}`).then(r=>r.json()).catch(()=>null));
-  const results = await Promise.all(promises);
-  priceCache = {};
-  results.forEach((d,i)=>{
-    if(d) priceCache[top30[i].s] = +d.priceChangePercent;
-  });
-  populateDropdown();
+// Safe fetch with fallback
+async function safeFetch(url){
+  try{
+    const r = await fetch(url,{cache:"no-store"});
+    if(!r.ok) throw new Error();
+    return await r.json();
+  }catch(e){
+    console.log("API down, retrying...");
+    return null;
+  }
 }
 
-function populateDropdown(){
+// Populate dropdown + cache 24h %
+async function loadDropdown(){
   coinSel.innerHTML = '';
-  top30.forEach(coin=>{
-    const change = priceCache[coin.s] ?? 0;
+  for(const coin of top30){
+    const data = await safeFetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${coin.s}`);
+    const change = data ? +data.priceChangePercent : 0;
     const opt = document.createElement('option');
     opt.value = coin.s;
-    opt.dataset.name = coin.n;
-    opt.textContent = `${coin.n} ${change >= 0 ? 'Up' : 'Down'} ${Math.abs(change).toFixed(2)}%`;
-    if(coin.s === currentSymbol) {
-      opt.selected = true;
-      coinSel.previousValue = coin.n; // for display
-    }
+    opt.textContent = `${coin.n} ${change>=0?'Up':'Down'} ${Math.abs(change).toFixed(2)}%`;
+    if(coin.s===currentSymbol) opt.selected = true;
     coinSel.appendChild(opt);
-  });
-  updateSelectedDisplay();
-}
-
-function updateSelectedDisplay(){
-  const selected = coinSel.options[coinSel.selectedIndex];
-  if(selected) coinSel.previousValue = selected.dataset.name;
-  coinSel.style.backgroundImage = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='%2300bfff'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E")`;
-  coinSel.style.backgroundPosition = 'right center';
-}
-
-// Override the displayed text of the <select> to only show ticker
-Object.defineProperty(coinSel, 'value', {
-  get: function() { return this._value || currentSymbol; },
-  set: function(val) {
-    this._value = val;
-    const opt = Array.from(this.options).find(o => o.value === val);
-    if(opt){
-      currentSymbol = val;
-      currentName = opt.dataset.name;
-      this.previousValue = currentName;
-      updateSelectedDisplay();
-    }
   }
-});
-
-// Force display only the ticker name
-coinSel.addEventListener('click', () => setTimeout(updateSelectedDisplay, 0));
-coinSel.addEventListener('change', updateSelectedDisplay);
-
-async function updatePrice(){
-  try{
-    const r=await fetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${currentSymbol}`);
-    const d=await r.json();
-    const p=+d.lastPrice,ch=+d.priceChangePercent;
-    priceLive.innerHTML=`$${p.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})} <span class="${ch>=0?'up':'down'}">${ch>=0?'+' : 'Minus'}${Math.abs(ch).toFixed(2)}%</span>`;
-  }catch{priceLive.textContent="$--"}
 }
 
+// Price update
+async function updatePrice(){
+  const data = await safeFetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${currentSymbol}`);
+  if(!data){
+    priceLive.textContent = "Offline";
+    return;
+  }
+  const p = +data.lastPrice;
+  const ch = +data.priceChangePercent;
+  priceLive.innerHTML = `$${p.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})} <span class="${ch>=0?'up':'down'}">${ch>=0?'+' : 'Minus'}${Math.abs(ch).toFixed(2)}%</span>`;
+}
+
+// Chart
 async function loadChart(tf){
-  let interval,limit;
+  let interval='1h', limit=168;
   if(tf==='1h'){interval='1m';limit=60}
   else if(tf==='1d'){interval='5m';limit=288}
   else if(tf==='7d'){interval='1h';limit=168}
@@ -183,69 +145,69 @@ async function loadChart(tf){
   else if(tf==='ytd'){interval='1d';limit=365}
   else{interval='1w';limit=1000}
 
-  const r=await fetch(`https://api.binance.com/api/v3/klines?symbol=${currentSymbol}&interval=${interval}&limit=${limit}`);
-  const data=await r.json();
-  if(!data||data.length<2)return;
+  const data = await safeFetch(`https://api.binance.com/api/v3/klines?symbol=${currentSymbol}&interval=${interval}&limit=${limit}`);
+  if(!data || data.length<2){
+    changeEl.textContent = "No data";
+    return;
+  }
 
-  const prices=data.map(k=>+k[4]);
-  const times=data.map(k=>new Date(k[0]));
+  const prices = data.map(k=>+k[4]);
+  const times = data.map(k=>new Date(k[0]));
+  const first=prices[0], last=prices[prices.length-1];
+  const change = ((last-first)/first)*100;
+  const tfName = tfSel.options[tfSel.selectedIndex].text;
+  changeEl.innerHTML = `<span class="${change>=0?'up':'down'}">${change>=0?'+' : 'Minus'}${Math.abs(change).toFixed(2)}%</span> (${tfName})`;
 
-  const first=prices[0],last=prices[prices.length-1];
-  const change=((last-first)/first)*100;
-  const tfName=tfSel.options[tfSel.selectedIndex].text;
-  changeEl.innerHTML=`<span class="${change>=0?'up':'down'}">${change>=0?'+' : 'Minus'}${Math.abs(change).toFixed(2)}%</span> (${tfName})`;
-
-  draw(prices,times,tf);
+  drawChart(prices, times, tf);
 }
 
-function draw(prices,times,tf){
+function drawChart(prices, times, tf){
   resize();
-  const W=canvas.width/devicePixelRatio;
-  const H=canvas.height/devicePixelRatio;
+  const W=canvas.width/devicePixelRatio, H=canvas.height/devicePixelRatio;
   ctx.clearRect(0,0,W,H);
 
-  const padX=70,padY=50;
-  const cw=W-padX-110,ch=H-2*padY;
-  const max=Math.max(...prices),min=Math.min(...prices),range=max-min||1;
+  const padX=70, padY=50, cw=W-padX-110, ch=H-2*padY;
+  const max=Math.max(...prices), min=Math.min(...prices), range=max-min||1;
 
+  // Area fill
   ctx.fillStyle='rgba(0,191,255,0.12)';
   ctx.beginPath();
-  prices.forEach((p,i)=>{const x=n padX+i*cw/(prices.length-1);
+  prices.forEach((p,i)=>{const x=padX+i*(cw/(prices.length-1));
     const y=H-padY-((p-min)/range)*ch;
     i===0?ctx.moveTo(x,y):ctx.lineTo(x,y)});
   ctx.lineTo(W-110,H-padY);ctx.lineTo(padX,H-padY);ctx.closePath();ctx.fill();
 
+  // Line
   ctx.strokeStyle='#00bfff';ctx.lineWidth=2.5;ctx.beginPath();
-  prices.forEach((p,i)=>{const x=padX+i*cw/(prices.length-1);
+  prices.forEach((p,i)=>{const x=padX+i*(cw/(prices.length-1));
     const y=H-padY-((p-min)/range)*ch;
     i===0?ctx.moveTo(x,y):ctx.lineTo(x,y)});
   ctx.stroke();
 
+  // Grid + labels (same as before)
   ctx.strokeStyle='#003340';
   for(let i=0;i<=4;i++){
     const y=padY+i*(ch/4);
     ctx.beginPath();ctx.moveTo(padX,y);ctx.lineTo(W-110,y);ctx.stroke();
   }
-
   ctx.fillStyle='#00bfff';ctx.font='14px monospace';ctx.textAlign='left';
   for(let i=0;i<=4;i++){
-    const y=padY+i*(ch/4);
     const val=max-i*(range/4);
-    ctx.fillText('$'+val.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g,','),W-105,y+6);
+    ctx.fillText('$'+val.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g,','),W-105,padY+i*(ch/4)+6);
   }
 
+  // X labels
   ctx.textAlign='center';
-  const isMobile=window.innerWidth<=768;
-  const count=isMobile?4:6;
+  const count = innerWidth<=768?4:6;
   for(let i=0;i<=count;i++){
     const idx=Math.round(i*(prices.length-1)/count);
-    const x=padX+idx*cw/(prices.length-1);
+    const x=padX+idx*(cw/(prices.length-1));
     const d=times[idx];
     let label='';
     if(tf==='1h') label=d.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}).replace(/:\d\d$/,'');
-    else if(tf==='1d') label=d.getHours().toString().padStart(2,'0')+'h';
+    else if(tf==='1d') label=d.getHours()+'h';
     else if(tf==='7d'||tf==='30d') label=d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
-    else if(tf==='ytd') label=d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+    else if(tf==='ytd') label=d.toLocaleDateString('en-US',{month:'short'});
     else label=d.getFullYear();
     ctx.fillText(label,x,H-padY+28);
   }
@@ -255,26 +217,28 @@ function draw(prices,times,tf){
 }
 
 // Events
-coinSel.onchange=()=>{
-  currentSymbol=coinSel.value;
-  const selected = coinSel.options[coinSel.selectedIndex];
-  currentName = selected.dataset.name;
+coinSel.onchange = () => {
+  const opt = coinSel.options[coinSel.selectedIndex];
+  currentSymbol = coinSel.value;
+  currentName = opt.textContent.split(' ')[0];
+  coinDisplay.textContent = currentName;
   updatePrice();
   loadChart(tfSel.value);
-  updateSelectedDisplay();
 };
-tfSel.onchange=()=>{loadChart(tfSel.value)};
+tfSel.onchange = () => loadChart(tfSel.value);
 
-// Init
-fetchTop30Data();
-updatePrice();
-loadChart('7d');
+// Start everything
+loadDropdown().then(() => {
+  coinDisplay.textContent = currentName;
+  updatePrice();
+  loadChart('7d');
+});
 
 setInterval(()=>{
   updatePrice();
   loadChart(tfSel.value);
-  fetchTop30Data();
-},30000);
+  loadDropdown();
+}, 30000);
 </script>
 </body>
 </html>
