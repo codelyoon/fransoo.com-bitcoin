@@ -6,7 +6,7 @@
 <title>fransoo.com | Crypto Portal</title>
 <style>
   body{background:#000;color:#00bfff;font-family:'Courier New',monospace;margin:0;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;overflow:hidden}
-  #static{position:absolute;inset:0;opacity:0.15;pointer-events:none;z-index:1}
+  #static{position:absolute;inset:0;opacity:0.65;pointer-events:none;z-index:1}
   .container{z-index:2;width:100%;max-width:1100px;padding:10px;box-sizing:border-box;display:flex;flex-direction:column;align-items:center}
   .typing{font-size:clamp(16px,4vw,22px);white-space:pre-line;text-align:center;margin-bottom:8px}
   .cursor{display:inline-block;width:10px;height:1.2em;background:#00bfff;animation:b 1s infinite;vertical-align:middle}
@@ -55,7 +55,7 @@
 </div>
 
 <script>
-// Static noise + typing (unchanged)
+// Static + typing
 const s=document.getElementById('static'),ctx2=s.getContext('2d');
 s.width=innerWidth;s.height=innerHeight;
 window.addEventListener('resize',()=>{s.width=innerWidth;s.height=innerHeight});
@@ -122,7 +122,6 @@ async function updateDropdown(){
   }
 }
 
-// Smart chart update — only adds new point when candle actually closes
 async function updateLive(){
   const data = await safeFetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${currentSymbol}`);
   if(!data) return;
@@ -131,7 +130,6 @@ async function updateLive(){
   const ch24 = +data.priceChangePercent;
   const now = Date.now();
 
-  // Pulse price
   if(lastPrice !== 0 && price !== lastPrice){
     priceLive.classList.add(price > lastPrice ? 'pulse-green' : 'pulse-red');
     setTimeout(()=>priceLive.classList.remove('pulse-green','pulse-red'),500);
@@ -141,7 +139,6 @@ async function updateLive(){
 
   priceLive.innerHTML = `$${price.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})} <span class="${ch24>=0?'up':'down'}">${ch24>=0?'+' : '-'} ${Math.abs(ch24).toFixed(2)}%</span>`;
 
-  // LIVE MODE: update every tick
   if(currentTf === 'live'){
     chartData.prices.push(price);
     chartData.times.push(new Date(now));
@@ -150,27 +147,26 @@ async function updateLive(){
     return;
   }
 
-  // CANDLE MODE: only update on new candle
   const intervalMs = {
-    '1h': 60*1000, '1d': 24*60*60*1000, '7d': 7*24*60*60*1000,
-    '30d': 30*24*60*60*1000, 'ytd': 365*24*60*60*1000, 'all': 365*24*60*60*1000
-  }[currentTf] || 60*60*1000;
+    '1h': 60*1000, '1d': 86400000, '7d': 3600000, '30d': 86400000*30, 'ytd': 86400000*365, 'all': 604800000
+  }[currentTf] || 3600000;
 
   const candleTime = Math.floor(now / intervalMs) * intervalMs;
   if(candleTime !== lastCandleTime){
     lastCandleTime = candleTime;
-    chartData.prices[chartData.prices.length-1] = price; // update current candle
-    if(chartData.prices.length > 1) drawChart(chartData.prices, chartData.times, currentTf);
+    chartData.prices.push(price);
+    chartData.times.push(new Date(candleTime));
   } else if(chartData.prices.length > 0){
     chartData.prices[chartData.prices.length-1] = price;
-    drawChart(chartData.prices, chartData.times, currentTf, price > lastPrice ? '#0f8' : price < lastPrice ? '#f44' : '#00bfff');
   }
+  drawChart(chartData.prices, chartData.times, currentTf, price > lastPrice ? '#0f8' : price < lastPrice ? '#f44' : '#00bfff');
 }
 
 async function loadChart(tf){
   currentTf = tf;
+  if(tf==='live') { chartData = {prices: [], times: []}; drawChart([], [], 'live'); return; }
+
   let interval='1h', limit=168;
-  if(tf==='live') { chartData = {prices: [], times: []}; return; }
   if(tf==='1h'){interval='1m';limit=60}
   else if(tf==='1d'){interval='5m';limit=288}
   else if(tf==='7d'){interval='1h';limit=168}
@@ -183,7 +179,7 @@ async function loadChart(tf){
 
   chartData.prices = data.map(k=>+k[4]);
   chartData.times = data.map(k=>new Date(k[0]));
-  lastCandleTime = Math.floor(Date.now() / (tf==='1h'?60*1000 : tf==='1d'?86400000 : 3600000)) * (tf==='1h'?60*1000 : tf==='1d'?86400000 : 3600000);
+  lastCandleTime = Math.floor(Date.now() / (tf==='1h'?60000 : tf==='1d'?86400000 : 3600000)) * (tf==='1h'?60000 : tf==='1d'?86400000 : 3600000);
 
   const first=chartData.prices[0], last=chartData.prices[chartData.prices.length-1];
   const change = ((last-first)/first)*100;
@@ -202,6 +198,7 @@ function drawChart(prices, times, tf, dotColor = '#00bfff'){
   const padX=70, padY=50, cw=W-padX-110, ch=H-2*padY;
   const max=Math.max(...prices), min=Math.min(...prices), range=max-min||1;
 
+  // Area fill
   ctx.fillStyle='rgba(0,191,255,0.12)';
   ctx.beginPath();
   prices.forEach((p,i)=>{const x=padX+i*(cw/(prices.length-1));
@@ -209,6 +206,7 @@ function drawChart(prices, times, tf, dotColor = '#00bfff'){
     i===0?ctx.moveTo(x,y):ctx.lineTo(x,y)});
   ctx.lineTo(W-110,H-padY);ctx.lineTo(padX,H-padY);ctx.closePath();ctx.fill();
 
+  // Line
   ctx.strokeStyle='#00bfff';ctx.lineWidth=2.5;ctx.beginPath();
   prices.forEach((p,i)=>{const x=padX+i*(cw/(prices.length-1));
     const y=H-padY-((p-min)/range)*ch;
@@ -222,9 +220,22 @@ function drawChart(prices, times, tf, dotColor = '#00bfff'){
   ctx.beginPath(); ctx.arc(lastX, lastY, 7, 0, Math.PI*2); ctx.fill();
   ctx.strokeStyle = '#00bfff'; ctx.lineWidth = 2; ctx.stroke();
 
-  // Time labels (disabled in LIVE mode)
+  // PRICE AXIS — FIXED & ALWAYS VISIBLE
+  ctx.strokeStyle='#003340';
+  for(let i=0;i<=5;i++){
+    const y = padY + i*(ch/5);
+    ctx.beginPath(); ctx.moveTo(padX,y); ctx.lineTo(W-110,y); ctx.stroke();
+  }
+  ctx.fillStyle='#00bfff'; ctx.font='14px monospace'; ctx.textAlign='right';
+  for(let i=0;i<=5;i++){
+    const val = max - i*(range/5);
+    const y = padY + i*(ch/5);
+    ctx.fillText('$' + val.toFixed(val > 1000 ? 0 : 2).replace(/\B(?=(\d{3})+(?!\d))/g, ','), W-120, y + 6);
+  }
+
+  // Time labels (disabled in LIVE)
   if(tf !== 'live'){
-    ctx.fillStyle='#00bfff';ctx.font='14px monospace';ctx.textAlign='center';
+    ctx.textAlign='center';
     const count = innerWidth<=768?4:6;
     for(let i=0;i<=count;i++){
       const idx=Math.round(i*(prices.length-1)/count);
@@ -268,7 +279,6 @@ async function init(){
 }
 init();
 
-// Live loop
 setInterval(updateLive, 3000);
 setInterval(updateDropdown, 60000);
 </script>
