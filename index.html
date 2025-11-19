@@ -12,9 +12,23 @@
   .cursor{display:inline-block;width:10px;height:1.2em;background:#00bfff;animation:b 1s infinite;vertical-align:middle}
   @keyframes b{0%,50%{opacity:1}51%,100%{opacity:0}}
   
-  #price-box{display:flex;align-items:center;gap:12px;font-size:clamp(30px,8vw,42px);font-weight:bold;z-index:10;text-shadow:0 0 15px #00bfff}
-  #coin-select{background:transparent;border:none;color:#00bfff;font-size:inherit;font-family:inherit;font-weight:bold;cursor:pointer;outline:none}
-  #coin-select option{color:#000;background:#00bfff;padding:8px}
+  #price-box{display:flex;align-items:center;gap:15px;font-size:clamp(30px,8vw,42px);font-weight:bold;z-index:10;text-shadow:0 0 15px #00bfff}
+  #coin-select{
+    background:transparent;
+    border:none;
+    color:#00bfff;
+    font-size:inherit;
+    font-family:inherit;
+    font-weight:bold;
+    cursor:pointer;
+    outline:none;
+    appearance:none;
+    -webkit-appearance:none;
+    padding-right:30.putpx; /* space for custom arrow */
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='%2300bfff'%3E%3Cpath d='M5 8l5 5 5-5z'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;
+    background-position:right center;
+  }
   .price{font-size:inherit}
   .up{color:#0f8}.down{color:#f44}
   
@@ -75,21 +89,21 @@ const coinSel=document.getElementById('coin-select');
 const tfSel=document.getElementById('tf-select');
 let currentSymbol = 'BTCUSDT';
 
-// Top 30 non-stable coins (by market cap, manually curated & updated Nov 2025)
+// Top 30 non-stable (Nov 2025 order)
 const top30 = [
-  {symbol:'BTCUSDT', name:'BTC'},  {symbol:'ETHUSDT', name:'ETH'},  {symbol:'BNBUSDT', name:'BNB'},
-  {symbol:'SOLUSDT', name:'SOL'},  {symbol:'XRPUSDT', name:'XRP'},  {symbol:'ADAUSDT', name:'ADA'},
-  {symbol:'DOGEUSDT', name:'DOGE'},{symbol:'TRXUSDT', name:'TRX'},  {symbol:'AVAXUSDT', name:'AVAX'},
-  {symbol:'SHIBUSDT', name:'SHIB'}, {symbol:'LINKUSDT', name:'LINK'},{symbol:'DOTUSDT', name:'DOT'},
-  {symbol:'LTCUSDT', name:'LTC'},   {symbol:'BCHUSDT', name:'BCH'},  {symbol:'NEARUSDT', name:'NEAR'},
-  {symbol:'HBARUSDT', name:'HBAR'}, {symbol:'MATICUSDT', name:'MATIC'},{symbol:'UNIUSDT', name:'UNI'},
-  {symbol:'ICPUSDT', name:'ICP'},   {symbol:'APTUSDT', name:'APT'},  {symbol:'CROUSDT', name:'CRO'},
-  {symbol:'XLMUSDT', name:'XLM'},   {symbol:'VETUSDT', name:'VET'},  {symbol:'FILUSDT', name:'FIL'},
-  {symbol:'KASUSDT', name:'KAS'},   {symbol:'ATOMUSDT', name:'ATOM'},{symbol:'STXUSDT', name:'STX'},
-  {symbol:'ARBUSDT', name:'ARB'},   {symbol:'IMXUSDT', name:'IMX'},  {symbol:'SUIUSDT', name:'SUI'}
+  {s:'BTCUSDT', n:'BTC'}, {s:'ETHUSDT', n:'ETH'}, {s:'BNBUSDT', n:'BNB'},
+  {s:'SOLUSDT', n:'SOL'}, {s:'XRPUSDT', n:'XRP'}, {s:'ADAUSDT', n:'ADA'},
+  {s:'DOGEUSDT', n:'DOGE'}, {s:'TRXUSDT', n:'TRX'}, {s:'AVAXUSDT', n:'AVAX'},
+  {s:'SHIBUSDT', n:'SHIB'}, {s:'LINKUSDT', n:'LINK'}, {s:'DOTUSDT', n:'DOT'},
+  {s:'LTCUSDT', n:'LTC'}, {s:'BCHUSDT', n:'BCH'}, {s:'NEARUSDT', n:'NEAR'},
+  {s:'HBARUSDT', n:'HBAR'}, {s:'MATICUSDT', n:'MATIC'}, {s:'UNIUSDT', n:'UNI'},
+  {s:'ICPUSDT', n:'ICP'}, {s:'APTUSDT', n:'APT'}, {s:'CROUSDT', n:'CRO'},
+  {s:'XLMUSDT', n:'XLM'}, {s:'VETUSDT', n:'VET'}, {s:'FILUSDT', n:'FIL'},
+  {s:'KASUSDT', n:'KAS'}, {s:'ATOMUSDT', n:'ATOM'}, {s:'STXUSDT', n:'STX'},
+  {s:'ARBUSDT', n:'ARB'}, {s:'IMXUSDT', n:'IMX'}, {s:'SUIUSDT', n:'SUI'}
 ];
 
-let priceCache = {}; // stores 24h % change for dropdown
+let priceCache = {};
 
 function resize(){
   canvas.width=canvas.offsetWidth*devicePixelRatio;
@@ -99,12 +113,11 @@ function resize(){
 window.addEventListener('resize',resize);resize();
 
 async function fetchTop30Data(){
-  const promises = top30.map(c => fetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${c.symbol}`).then(r=>r.json()));
+  const promises = top30.map(c => fetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${c.s}`).then(r=>r.json()).catch(()=>null));
   const results = await Promise.all(promises);
   priceCache = {};
   results.forEach((d,i)=>{
-    const change = +d.priceChangePercent;
-    priceCache[top30[i].symbol] = change;
+    if(d) priceCache[top30[i].s] = +d.priceChangePercent;
   });
   populateDropdown();
 }
@@ -112,14 +125,12 @@ async function fetchTop30Data(){
 function populateDropdown(){
   coinSel.innerHTML = '';
   top30.forEach(coin=>{
-    const change = priceCache[coin.symbol] || 0;
-    const arrow = change >= 0 ? 'Up' : 'Down';
-    const color = change >= 0 ? '#0f8' : '#f44';
+    const change = priceCache[coin.s] ?? 0;
     const opt = document.createElement('option');
-    opt.value = coin.symbol;
-    opt.textContent = `${coin.name} ${arrow} ${Math.abs(change).toFixed(2)}%`;
-    opt.style.color = color;
-    if(coin.symbol === currentSymbol) opt.selected = true;
+    opt.value = coin.s;
+    opt.textContent = `${coin.n} ${change>=0?'Up':'Down'} ${Math.abs(change).toFixed(2)}%`;
+    opt.style.color = change >= 0 ? '#0f8' : '#f44';
+    if(coin.s === currentSymbol) opt.selected = true;
     coinSel.appendChild(opt);
   });
 }
@@ -229,7 +240,7 @@ loadChart('7d');
 setInterval(()=>{
   updatePrice();
   loadChart(tfSel.value);
-  fetchTop30Data(); // refresh dropdown % every 30s
+  fetchTop30Data();
 },30000);
 </script>
 </body>
