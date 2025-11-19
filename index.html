@@ -6,24 +6,33 @@
 <title>fransoo.com | Crypto Portal</title>
 <style>
   body{background:#000;color:#00bfff;font-family:'Courier New',monospace;margin:0;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;overflow:hidden}
-  #static{position:absolute;inset:0;opacity:0.15;pointer-events:none;z-index:1}
-  .container{z-index:2;width:100%;max-width:1100px;padding:10px;box-sizing:border-box;display:flex;flex-direction:column;align-items:center}
-  .typing{font-size:clamp(16px,4vw,22px);white-space:pre-line;text-align:center;margin-bottom:8px}
-  .cursor{display:inline-block;width:10px;height:1.2em;background:#00bfff;animation:b 1s infinite;vertical-align:middle}
+  #static{position:absolute;inset:0;opacity:0.85;pointer-events:none;z-index:1}
+  .container{z-index:2;width:100%;max-width:1100px;padding:10px 15px;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;gap:10px}
+  .typing{font-size:clamp(15px,4vw,21px);text-align:center;margin-bottom:5px;white-space:pre-line}
+  .cursor{display:inline-block;width:8px;height:1.1em;background:#00bfff;animation:b 1s infinite}
   @keyframes b{0%,50%{opacity:1}51%,100%{opacity:0}}
-  
-  #price-box{display:flex;align-items:center;gap:15px;font-size:clamp(30px,8vw,42px);font-weight:bold;z-index:10;text-shadow:0 0 15px #00bfff;position:relative}
+
+  #price-box{display:flex;align-items:center;gap:15px;font-size:clamp(28px,8vw,44px);font-weight:bold;position:relative}
   #coin-display{font-weight:bold;color:#00bfff}
-  #coin-select{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
-  #price-live{transition:background 0.4s}
+  #coin-select{position:absolute;inset:0;opacity:0;cursor:pointer}
+  #price-live{transition:background 0.4s;text-shadow:0 0 15px #00bfff}
   .pulse-green{background:rgba(0,255,0,0.3)!important}
   .pulse-red{background:rgba(255,0,0,0.3)!important}
   .up{color:#0f8}.down{color:#f44}
-  
-  #chart-container{position:relative;width:100%;max-width:1100px;height:60vh;border:1px solid #00bfff;background:#000;margin:10px 0}
+
+  #chart-container{position:relative;width:100%;height:58vh;border:1px solid #00bfff;background:#000;border-radius:8px;overflow:hidden}
   canvas{width:100%!important;height:100%!important;display:block}
-  #tf-select{position:absolute;top:12px;left:12px;z-index:10;background:#000;border:1px solid #00bfff;color:#00bfff;padding:10px 18px;font-size:16px;border-radius:6px}
-  #change{font-size:clamp(17px,4.5vw,21px);margin-top:10px;font-weight:bold}
+  #tf-select{position:absolute;top:10px;left:10px;z-index:10;background:#000;border:1px solid #00bfff;color:#00bfff;padding:8px 16px;font-size:15px;border-radius:6px;outline:none}
+  #change{font-size:clamp(16px,4.5vw,22px);font-weight:bold;margin-top:5px}
+
+  /* Mobile Optimizations */
+  @media (max-width: 768px) {
+    .container{padding:10px 8px;gap:8px}
+    #price-box{gap:10px;font-size:clamp(26px,9vw,38px)}
+    #chart-container{height:55vh}
+    #tf-select{font-size:14px;padding:7px 14px}
+    #change{font-size:18px}
+  }
 </style>
 </head>
 <body>
@@ -55,13 +64,14 @@
 </div>
 
 <script>
-// Static + typing
+// Static noise
 const s=document.getElementById('static'),ctx2=s.getContext('2d');
 s.width=innerWidth;s.height=innerHeight;
 window.addEventListener('resize',()=>{s.width=innerWidth;s.height=innerHeight});
 (function n(){const i=ctx2.createImageData(s.width,s.height),d=new Uint32Array(i.data.buffer);
 for(let j=0;j<d.length;j++)if(Math.random()<0.09)d[j]=0x33ffffff;ctx2.putImageData(i,0,0);requestAnimationFrame(n)})();
 
+// Typing
 const intro=`welcome to the fransoo.com crypto portal
 
 live charts • top 30 coins • real-time`;
@@ -80,7 +90,6 @@ const tfSel=document.getElementById('tf-select');
 let currentSymbol = 'BTCUSDT';
 let currentName = 'BTC';
 let lastPrice = 0;
-let currentPrice = 0;
 let chartData = {prices: [], times: []};
 let lastCandleTime = 0;
 let currentTf = '7d';
@@ -135,18 +144,18 @@ async function updateLive(){
     setTimeout(()=>priceLive.classList.remove('pulse-green','pulse-red'),500);
   }
   lastPrice = price;
-  currentPrice = price;
 
   priceLive.innerHTML = `$${price.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})} <span class="${ch24>=0?'up':'down'}">${ch24>=0?'+' : '-'} ${Math.abs(ch24).toFixed(2)}%</span>`;
 
   if(currentTf === 'live'){
     chartData.prices.push(price);
     chartData.times.push(new Date(now));
-    if(chartData.prices.length > 300) { chartData.prices.shift(); chartData.times.shift(); }
+    if(chartData.prices.length > 400) { chartData.prices.shift(); chartData.times.shift(); }
     drawChart(chartData.prices, chartData.times, 'live', price > lastPrice ? '#0f8' : price < lastPrice ? '#f44' : '#00bfff');
     return;
   }
 
+  // Normal candle updates
   const intervalMs = {
     '1h': 60*1000, '1d': 86400000, '7d': 3600000, '30d': 86400000*30, 'ytd': 86400000*365, 'all': 604800000
   }[currentTf] || 3600000;
@@ -179,7 +188,6 @@ async function loadChart(tf){
 
   chartData.prices = data.map(k=>+k[4]);
   chartData.times = data.map(k=>new Date(k[0]));
-  lastCandleTime = Math.floor(Date.now() / (tf==='1h'?60000 : tf==='1d'?86400000 : 3600000)) * (tf==='1h'?60000 : tf==='1d'?86400000 : 3600000);
 
   const first=chartData.prices[0], last=chartData.prices[chartData.prices.length-1];
   const change = ((last-first)/first)*100;
@@ -195,16 +203,17 @@ function drawChart(prices, times, tf, dotColor = '#00bfff'){
   ctx.clearRect(0,0,W,H);
   if(prices.length < 2) return;
 
-  const padX=70, padY=50, chartWidth=W-padX-10, chartHeight=H-2*padY;
+  // Extra padding on right for price labels
+  const padX=65, padY=45, chartWidth=W-padX-85, chartHeight=H-2*padY;
   const max=Math.max(...prices), min=Math.min(...prices), range=max-min||1;
 
-  // Area fill
+  // Area
   ctx.fillStyle='rgba(0,191,255,0.12)';
   ctx.beginPath();
   prices.forEach((p,i)=>{const x=padX+i*(chartWidth/(prices.length-1));
     const y=H-padY-((p-min)/range)*chartHeight;
     i===0?ctx.moveTo(x,y):ctx.lineTo(x,y)});
-  ctx.lineTo(W-10,H-padY);ctx.lineTo(padX,H-padY);ctx.closePath();ctx.fill();
+  ctx.lineTo(W-85,H-padY);ctx.lineTo(padX,H-padY);ctx.closePath();ctx.fill();
 
   // Line
   ctx.strokeStyle='#00bfff';ctx.lineWidth=2.5;ctx.beginPath();
@@ -217,28 +226,28 @@ function drawChart(prices, times, tf, dotColor = '#00bfff'){
   const lastX = padX + (prices.length-1)*(chartWidth/(prices.length-1));
   const lastY = H-padY-((prices[prices.length-1]-min)/range)*chartHeight;
   ctx.fillStyle = dotColor;
-  ctx.beginPath(); ctx.arc(lastX, lastY, 7, 0, Math.PI*2); ctx.fill();
-  ctx.strokeStyle = '#00bfff'; ctx.lineWidth = 2; ctx.stroke();
+  ctx.beginPath(); ctx.arc(lastX, lastY, 8, 0, Math.PI*2); ctx.fill();
+  ctx.strokeStyle = '#00bfff'; ctx.lineWidth = 2.5; ctx.stroke();
 
-  // Horizontal grid lines
+  // Horizontal grid
   ctx.strokeStyle='#003340';
   for(let i=0;i<=5;i++){
     const y = padY + i*(chartHeight/5);
-    ctx.beginPath(); ctx.moveTo(padX,y); ctx.lineTo(W-10,y); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(padX,y); ctx.lineTo(W-85,y); ctx.stroke();
   }
 
-  // PRICE AXIS — NOW ON THE RIGHT OUTER BORDER
+  // PRICE AXIS — OUTSIDE, RIGHT SIDE, PERFECT
   ctx.fillStyle='#00bfff'; ctx.font='14px monospace'; ctx.textAlign='right';
   for(let i=0;i<=5;i++){
     const val = max - i*(range/5);
     const y = padY + i*(chartHeight/5);
-    ctx.fillText('$' + val.toFixed(val > 1000 ? 0 : 2).replace(/\B(?=(\d{3})+(?!\d))/g, ','), W-18, y + 6);
+    ctx.fillText('$' + val.toFixed(val > 1000 ? 0 : 2).replace(/\B(?=(\d{3})+(?!\d))/g, ','), W-15, y + 5);
   }
 
-  // Time labels (disabled in LIVE)
+  // Time labels (only when not LIVE)
   if(tf !== 'live'){
-    ctx.textAlign='center';
-    const count = innerWidth<=768?4:6;
+    ctx.textAlign='center'; ctx.fillStyle='#00bfff'; ctx.font='13px monospace';
+    const count = innerWidth<=768?4:7;
     for(let i=0;i<=count;i++){
       const idx=Math.round(i*(prices.length-1)/count);
       const x=padX+idx*(chartWidth/(prices.length-1));
@@ -247,12 +256,12 @@ function drawChart(prices, times, tf, dotColor = '#00bfff'){
                   tf==='1d' ? d.getHours()+'h' :
                   tf==='7d'||tf==='30d' ? d.toLocaleDateString('en-US',{month:'short',day:'numeric'}) :
                   tf==='ytd' ? d.toLocaleDateString('en-US',{month:'short'}) : d.getFullYear();
-      ctx.fillText(label,x,H-padY+28);
+      ctx.fillText(label,x,H-padY+25);
     }
   }
 
   // Border
-  ctx.strokeStyle='#00bfff';ctx.lineWidth=1.5;
+  ctx.strokeStyle='#00bfff';ctx.lineWidth=1.8;
   ctx.strokeRect(padX,padY,chartWidth,chartHeight);
 }
 
