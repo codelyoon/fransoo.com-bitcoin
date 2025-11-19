@@ -24,8 +24,8 @@
     outline:none;
     appearance:none;
     -webkit-appearance:none;
-    padding-right:30.putpx; /* space for custom arrow */
-    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='%2300bfff'%3E%3Cpath d='M5 8l5 5 5-5z'/%3E%3C/svg%3E");
+    padding-right:35px;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='%2300bfff'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
     background-repeat:no-repeat;
     background-position:right center;
   }
@@ -88,8 +88,8 @@ const changeEl=document.getElementById('change');
 const coinSel=document.getElementById('coin-select');
 const tfSel=document.getElementById('tf-select');
 let currentSymbol = 'BTCUSDT';
+let currentName = 'BTC';
 
-// Top 30 non-stable (Nov 2025 order)
 const top30 = [
   {s:'BTCUSDT', n:'BTC'}, {s:'ETHUSDT', n:'ETH'}, {s:'BNBUSDT', n:'BNB'},
   {s:'SOLUSDT', n:'SOL'}, {s:'XRPUSDT', n:'XRP'}, {s:'ADAUSDT', n:'ADA'},
@@ -128,12 +128,42 @@ function populateDropdown(){
     const change = priceCache[coin.s] ?? 0;
     const opt = document.createElement('option');
     opt.value = coin.s;
-    opt.textContent = `${coin.n} ${change>=0?'Up':'Down'} ${Math.abs(change).toFixed(2)}%`;
-    opt.style.color = change >= 0 ? '#0f8' : '#f44';
-    if(coin.s === currentSymbol) opt.selected = true;
+    opt.dataset.name = coin.n;
+    opt.textContent = `${coin.n} ${change >= 0 ? 'Up' : 'Down'} ${Math.abs(change).toFixed(2)}%`;
+    if(coin.s === currentSymbol) {
+      opt.selected = true;
+      coinSel.previousValue = coin.n; // for display
+    }
     coinSel.appendChild(opt);
   });
+  updateSelectedDisplay();
 }
+
+function updateSelectedDisplay(){
+  const selected = coinSel.options[coinSel.selectedIndex];
+  if(selected) coinSel.previousValue = selected.dataset.name;
+  coinSel.style.backgroundImage = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='%2300bfff'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E")`;
+  coinSel.style.backgroundPosition = 'right center';
+}
+
+// Override the displayed text of the <select> to only show ticker
+Object.defineProperty(coinSel, 'value', {
+  get: function() { return this._value || currentSymbol; },
+  set: function(val) {
+    this._value = val;
+    const opt = Array.from(this.options).find(o => o.value === val);
+    if(opt){
+      currentSymbol = val;
+      currentName = opt.dataset.name;
+      this.previousValue = currentName;
+      updateSelectedDisplay();
+    }
+  }
+});
+
+// Force display only the ticker name
+coinSel.addEventListener('click', () => setTimeout(updateSelectedDisplay, 0));
+coinSel.addEventListener('change', updateSelectedDisplay);
 
 async function updatePrice(){
   try{
@@ -180,7 +210,7 @@ function draw(prices,times,tf){
 
   ctx.fillStyle='rgba(0,191,255,0.12)';
   ctx.beginPath();
-  prices.forEach((p,i)=>{const x=padX+i*cw/(prices.length-1);
+  prices.forEach((p,i)=>{const x=n padX+i*cw/(prices.length-1);
     const y=H-padY-((p-min)/range)*ch;
     i===0?ctx.moveTo(x,y):ctx.lineTo(x,y)});
   ctx.lineTo(W-110,H-padY);ctx.lineTo(padX,H-padY);ctx.closePath();ctx.fill();
@@ -227,8 +257,11 @@ function draw(prices,times,tf){
 // Events
 coinSel.onchange=()=>{
   currentSymbol=coinSel.value;
+  const selected = coinSel.options[coinSel.selectedIndex];
+  currentName = selected.dataset.name;
   updatePrice();
   loadChart(tfSel.value);
+  updateSelectedDisplay();
 };
 tfSel.onchange=()=>{loadChart(tfSel.value)};
 
