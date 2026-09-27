@@ -161,7 +161,9 @@
       letter-spacing: 0.08em;
       text-transform: uppercase;
       color: var(--dim);
-      min-height: 1.4em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .cursor {
       display: inline-block;
@@ -269,7 +271,13 @@
       overflow: hidden;
       cursor: crosshair;
     }
-    canvas { width: 100% !important; height: 100% !important; display: block; }
+    canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
     #tf-select {
       position: absolute;
       top: 12px;
@@ -303,9 +311,21 @@
     @media (min-width: 769px) { #hover-price { display: block; } }
     @media (max-width: 768px) {
       body { overflow: auto; }
-      .wrap { height: auto; padding-bottom: 32px; }
-      #chart-container { height: 54vh; cursor: default; }
-      .wrap { height: auto; }
+      .wrap {
+        height: auto;
+        min-height: 0;
+        padding: 14px 16px 28px;
+        gap: 10px;
+      }
+      .intro { font-size: 10px; letter-spacing: 0.04em; }
+      .cursor { display: none; }
+      #chart-container {
+        flex: none;
+        height: min(52dvh, 420px);
+        min-height: 280px;
+        cursor: default;
+      }
+      #price-live .pct { font-size: 15px; }
     }
   </style>
 </head>
@@ -361,16 +381,20 @@
   <script>
     const intro = "live charts  ·  top 30 coins  ·  binance feed";
     const typing = document.getElementById("typing");
-    let i = 0;
-    const ti = setInterval(() => {
-      if (i < intro.length) {
-        typing.textContent += intro[i];
-        i++;
-      } else {
-        clearInterval(ti);
-        typing.innerHTML += '<span class="cursor"></span>';
-      }
-    }, 28);
+    if (window.innerWidth <= 768) {
+      typing.textContent = intro;
+    } else {
+      let i = 0;
+      const ti = setInterval(() => {
+        if (i < intro.length) {
+          typing.textContent += intro[i];
+          i++;
+        } else {
+          clearInterval(ti);
+          typing.innerHTML += '<span class="cursor"></span>';
+        }
+      }, 28);
+    }
 
     const canvas = document.getElementById("c");
     const ctx = canvas.getContext("2d");
@@ -403,16 +427,45 @@
       return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
     }
 
+    function isMobile() { return window.innerWidth <= 768; }
+
+    function chartBox() {
+      const mobile = isMobile();
+      return {
+        padX: mobile ? 10 : 28,
+        padTop: mobile ? 44 : 52,
+        padBot: mobile ? 26 : 44,
+        right: mobile ? 48 : 78,
+        ticks: mobile ? 3 : 5,
+        font: mobile ? "10px IBM Plex Mono, monospace" : "12px IBM Plex Mono, monospace"
+      };
+    }
+
     function resize() {
-      canvas.width = canvas.offsetWidth * devicePixelRatio;
-      canvas.height = canvas.offsetHeight * devicePixelRatio;
-      ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+      const box = canvas.parentElement.getBoundingClientRect();
+      const w = Math.max(1, Math.round(box.width));
+      const h = Math.max(1, Math.round(box.height));
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.style.width = w + "px";
+      canvas.style.height = h + "px";
+      canvas.width = Math.floor(w * dpr);
+      canvas.height = Math.floor(h * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
     window.addEventListener("resize", () => {
       resize();
       drawChart(chartData.prices, chartData.times, currentTf);
     });
-    resize();
+    window.addEventListener("orientationchange", () => {
+      setTimeout(() => {
+        resize();
+        drawChart(chartData.prices, chartData.times, currentTf);
+      }, 200);
+    });
+    requestAnimationFrame(() => {
+      resize();
+      drawChart(chartData.prices, chartData.times, currentTf);
+    });
 
     async function safeFetch(url) {
       try {
@@ -523,77 +576,77 @@
 
     function drawChart(prices, times, tf) {
       resize();
-      const W = canvas.width / devicePixelRatio, H = canvas.height / devicePixelRatio;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const W = canvas.width / dpr, H = canvas.height / dpr;
       ctx.clearRect(0, 0, W, H);
-      if (prices.length < 2) return;
-      const padX = 28, padY = 52, right = 78, chartWidth = W - padX - right, chartHeight = H - 96;
+      if (prices.length < 2 || H < 80) return;
+      const { padX, padTop, padBot, right, ticks, font } = chartBox();
+      const chartWidth = Math.max(20, W - padX - right);
+      const chartHeight = Math.max(20, H - padTop - padBot);
       const max = Math.max(...prices), min = Math.min(...prices), range = max - min || 1;
       const blue = css("--blue") || "#2f7fff";
       const muted = css("--dim") || "#6b7380";
       const line = "rgba(255,255,255,0.06)";
+      const yAt = (p) => padTop + (1 - (p - min) / range) * chartHeight;
+      const xAt = (idx) => padX + idx * (chartWidth / (prices.length - 1));
 
       ctx.fillStyle = "rgba(47,127,255,0.10)";
       ctx.beginPath();
       prices.forEach((p, idx) => {
-        const x = padX + idx * (chartWidth / (prices.length - 1));
-        const y = H - 44 - ((p - min) / range) * chartHeight;
+        const x = xAt(idx), y = yAt(p);
         idx === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
       });
-      ctx.lineTo(W - right, H - 44);
-      ctx.lineTo(padX, H - 44);
+      ctx.lineTo(padX + chartWidth, padTop + chartHeight);
+      ctx.lineTo(padX, padTop + chartHeight);
       ctx.closePath();
       ctx.fill();
 
       ctx.strokeStyle = blue;
-      ctx.lineWidth = 2;
+      ctx.lineWidth = isMobile() ? 1.6 : 2;
       ctx.beginPath();
       prices.forEach((p, idx) => {
-        const x = padX + idx * (chartWidth / (prices.length - 1));
-        const y = H - 44 - ((p - min) / range) * chartHeight;
+        const x = xAt(idx), y = yAt(p);
         idx === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
       });
       ctx.stroke();
 
       if (!hoverPrice.style.opacity || hoverPrice.style.opacity === "0") {
-        const lastX = padX + (prices.length - 1) * (chartWidth / (prices.length - 1));
-        const lastY = H - 44 - ((prices[prices.length - 1] - min) / range) * chartHeight;
         ctx.fillStyle = blue;
         ctx.beginPath();
-        ctx.arc(lastX, lastY, 5, 0, Math.PI * 2);
+        ctx.arc(xAt(prices.length - 1), yAt(prices[prices.length - 1]), isMobile() ? 4 : 5, 0, Math.PI * 2);
         ctx.fill();
       }
 
       ctx.strokeStyle = line;
       ctx.lineWidth = 1;
-      for (let g = 0; g <= 5; g++) {
-        const y = padY + g * (chartHeight / 5);
+      for (let g = 0; g <= ticks; g++) {
+        const y = padTop + g * (chartHeight / ticks);
         ctx.beginPath();
         ctx.moveTo(padX, y);
-        ctx.lineTo(W - right, y);
+        ctx.lineTo(padX + chartWidth, y);
         ctx.stroke();
       }
 
       ctx.fillStyle = muted;
-      ctx.font = "12px IBM Plex Mono, monospace";
+      ctx.font = font;
       ctx.textAlign = "right";
-      for (let g = 0; g <= 5; g++) {
-        const val = max - g * (range / 5);
-        const y = padY + g * (chartHeight / 5);
-        ctx.fillText("$" + val.toFixed(val > 1000 ? 0 : 2).replace(/\B(?=(\d{3})+(?!\d))/g, ","), W - 14, y + 4);
+      for (let g = 0; g <= ticks; g++) {
+        const val = max - g * (range / ticks);
+        const y = padTop + g * (chartHeight / ticks);
+        ctx.fillText("$" + val.toFixed(val > 1000 ? 0 : 2).replace(/\B(?=(\d{3})+(?!\d))/g, ","), W - 8, y + 3);
       }
 
       if (tf !== "live") {
         ctx.textAlign = "center";
-        const count = innerWidth <= 768 ? 4 : 7;
+        const count = isMobile() ? 3 : 7;
         for (let t = 0; t <= count; t++) {
           const idx = Math.round(t * (prices.length - 1) / count);
-          const x = padX + idx * (chartWidth / (prices.length - 1));
           const d = times[idx];
           let label = tf === "1h" ? d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }) :
             tf === "1d" ? d.getHours() + "h" :
             tf === "7d" || tf === "30d" ? d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) :
             tf === "ytd" ? d.toLocaleDateString("en-US", { month: "short" }) : String(d.getFullYear());
-          ctx.fillText(label, x, H - 18);
+          ctx.fillText(label, xAt(idx), H - 8);
         }
       }
     }
@@ -603,10 +656,13 @@
       const rect = canvas.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
-      const W = canvas.width / devicePixelRatio;
-      const H = canvas.height / devicePixelRatio;
-      const padX = 28, right = 78, chartWidth = W - padX - right, chartHeight = H - 96;
-      if (mouseX < padX || mouseX > W - right || mouseY < 52 || mouseY > H - 44) {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const W = canvas.width / dpr;
+      const H = canvas.height / dpr;
+      const { padX, padTop, padBot, right } = chartBox();
+      const chartWidth = W - padX - right;
+      const chartHeight = H - padTop - padBot;
+      if (mouseX < padX || mouseX > W - right || mouseY < padTop || mouseY > H - padBot) {
         hoverPrice.style.opacity = "0";
         drawChart(chartData.prices, chartData.times, currentTf);
         return;
@@ -618,7 +674,7 @@
       if (index < 0 || index >= prices.length) return;
       const price = prices[index];
       const pointX = padX + index * (chartWidth / (prices.length - 1));
-      const pointY = H - 44 - ((price - min) / range) * chartHeight;
+      const pointY = padTop + (1 - (price - min) / range) * chartHeight;
       drawChart(prices, chartData.times, currentTf);
       ctx.fillStyle = "#9ec5ff";
       ctx.beginPath();
