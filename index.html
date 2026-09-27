@@ -1,344 +1,663 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>fransoo.com | Crypto Portal</title>
-<style>
-  body{background:#000;color:#00bfff;font-family:'Courier New',monospace;margin:0;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;overflow:hidden}
-  #static{position:absolute;inset:0;opacity:0.85;pointer-events:none;z-index:1}
-  .container{z-index:2;width:100%;max-width:1100px;padding:10px 15px;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;gap:10px}
-  .typing{font-size:clamp(15px,4vw,21px);text-align:center;margin-bottom:5px;white-space:pre-line}
-  .cursor{display:inline-block;width:8px;height:1.1em;background:#00bfff;animation:b 1s infinite}
-  @keyframes b{0%,50%{opacity:1}51%,100%{opacity:0}}
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>bitcoin.fransoo.com</title>
+  <meta name="description" content="Live crypto prices and charts from fransoo.com." />
+  <meta name="theme-color" content="#0B0D10" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0b0d10;
+      --ink: #f4f6f8;
+      --muted: #9aa3b2;
+      --dim: #6b7380;
+      --line: rgba(255,255,255,0.08);
+      --blue: #2f7fff;
+      --blue-2: #5b9bff;
+      --blue-soft: rgba(47,127,255,0.14);
+      --card: #14181f;
+      --card-2: #12161c;
+      --header: rgba(11,13,16,0.72);
+      --input: #0f1318;
+      --glow: rgba(47,127,255,0.16);
+      --up: #3dba6e;
+      --down: #ef4444;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Outfit, system-ui, sans-serif;
+      min-height: 100vh;
+      overflow: hidden;
+      position: relative;
+    }
+    a { color: inherit; text-decoration: none; }
+    select, button { font-family: inherit; }
 
-  #price-box{display:flex;align-items:center;gap:15px;font-size:clamp(28px,8vw,44px);font-weight:bold;position:relative}
-  #coin-display{font-weight:bold;color:#00bfff}
-  #coin-select{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
-  #price-live{transition:background 0.4s;text-shadow:0 0 15px #00bfff}
-  .pulse-green{background:rgba(0,255,0,0.3)!important}
-  .pulse-red{background:rgba(255,0,0,0.3)!important}
-  .up{color:#0f8}.down{color:#f44}
+    .noise {
+      pointer-events: none;
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      opacity: 0.035;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    }
+    .glow {
+      pointer-events: none;
+      position: fixed;
+      width: 720px;
+      height: 720px;
+      border-radius: 50%;
+      background: radial-gradient(circle, var(--glow), transparent 62%);
+      top: -240px;
+      right: -180px;
+      z-index: 0;
+    }
 
-  #chart-container{position:relative;width:100%;height:58vh;border:1px solid #00bfff;background:#000;border-radius:8px;overflow:hidden;cursor:crosshair}
-  canvas{width:100%!important;height:100%!important;display:block}
-  #tf-select{position:absolute;top:10px;left:10px;z-index:10;background:#000;border:1px solid #00bfff;color:#00bfff;padding:8px 16px;font-size:15px;border-radius:6px;outline:none}
-  #change{font-size:clamp(16px,4.5vw,22px);font-weight:bold;margin-top:5px}
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      backdrop-filter: blur(16px);
+      background: var(--header);
+      border-bottom: 1px solid var(--line);
+    }
+    .nav {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 0 24px;
+      height: 68px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .brand {
+      font-weight: 600;
+      letter-spacing: -0.04em;
+      font-size: 20px;
+    }
+    .nav-meta {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .nav-meta a {
+      color: var(--blue-2);
+    }
+    .live-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--up);
+      box-shadow: 0 0 0 4px rgba(61,186,110,0.18);
+      animation: pulse 1.6s ease infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.45; }
+    }
 
-  #hover-price{
-    position:absolute;z-index:20;color:#00bfff;font:bold 15px monospace;
-    background:rgba(0,0,0,0.85);padding:8px 14px;border-radius:8px;
-    border:1px solid #00bfff;box-shadow:0 0 20px #00bfff;pointer-events:none;
-    opacity:0;transition:opacity 0.12s;white-space:nowrap;
-    transform:translateX(-50%);left:0;top:0;display:none;
-  }
-  @media (min-width: 769px) {#hover-price{display:block}}
+    .tape {
+      position: relative;
+      z-index: 20;
+      border-bottom: 1px solid var(--line);
+      background: rgba(11,13,16,0.55);
+      overflow: hidden;
+      height: 42px;
+    }
+    .tape-track {
+      display: flex;
+      align-items: center;
+      height: 42px;
+      width: max-content;
+      animation: tape-scroll 42s linear infinite;
+    }
+    .tape:hover .tape-track { animation-play-state: paused; }
+    @keyframes tape-scroll {
+      from { transform: translateX(0); }
+      to { transform: translateX(-50%); }
+    }
+    .tape-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 22px;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 12px;
+      white-space: nowrap;
+      cursor: pointer;
+      border: 0;
+      background: transparent;
+      color: var(--ink);
+    }
+    .tape-item:hover { opacity: 0.7; }
+    .tape-item .sym { font-weight: 500; }
+    .tape-item.up { color: var(--up); }
+    .tape-item.down { color: var(--down); }
 
-  @media (max-width: 768px) {
-    .container{padding:10px 8px;gap:8px}
-    #price-box{gap:10px;font-size:clamp(26px,9vw,38px)}
-    #chart-container{height:55vh;cursor:default}
-    #tf-select{font-size:14px;padding:7px 14px}
-    #change{font-size:18px}
-  }
-</style>
+    .wrap {
+      position: relative;
+      z-index: 2;
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 22px 24px 24px;
+      height: calc(100vh - 110px);
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .intro {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--dim);
+      min-height: 1.4em;
+    }
+    .cursor {
+      display: inline-block;
+      width: 7px;
+      height: 1em;
+      background: var(--blue);
+      margin-left: 4px;
+      vertical-align: -2px;
+      animation: blink 1s infinite;
+    }
+    @keyframes blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
+
+    .price-row {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .price-main {
+      display: flex;
+      align-items: baseline;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+    .coin-wrap {
+      position: relative;
+      font-size: clamp(28px, 5vw, 42px);
+      font-weight: 600;
+      letter-spacing: -0.05em;
+      color: var(--ink);
+    }
+    .coin-hint {
+      position: absolute;
+      top: calc(100% + 8px);
+      left: 0;
+      white-space: nowrap;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 11px;
+      letter-spacing: 0.02em;
+      font-weight: 400;
+      color: var(--ink);
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 6px 10px;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(-4px);
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      z-index: 40;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+    }
+    .coin-hint.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    #coin-select {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+      width: 100%;
+      height: 100%;
+    }
+    .coin-wrap::after {
+      content: "▾";
+      font-size: 14px;
+      color: var(--dim);
+      margin-left: 6px;
+      vertical-align: middle;
+    }
+    #price-live {
+      font-size: clamp(28px, 5vw, 42px);
+      font-weight: 600;
+      letter-spacing: -0.05em;
+      border-radius: 10px;
+      padding: 0 6px;
+      transition: background 0.35s ease;
+    }
+    #price-live .pct {
+      font-size: 18px;
+      font-weight: 500;
+      margin-left: 8px;
+      letter-spacing: -0.02em;
+    }
+    .pulse-green { background: rgba(61,186,110,0.18); }
+    .pulse-red { background: rgba(239,68,68,0.18); }
+    .up { color: var(--up); }
+    .down { color: var(--down); }
+
+    #change {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    #chart-container {
+      position: relative;
+      flex: 1;
+      min-height: 280px;
+      border: 1px solid var(--line);
+      background: linear-gradient(180deg, var(--card), var(--card-2));
+      border-radius: 18px;
+      overflow: hidden;
+      cursor: crosshair;
+    }
+    canvas { width: 100% !important; height: 100% !important; display: block; }
+    #tf-select {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      z-index: 10;
+      background: var(--input);
+      border: 1px solid var(--line);
+      color: var(--ink);
+      padding: 8px 12px;
+      font-size: 13px;
+      border-radius: 999px;
+      outline: none;
+    }
+    #tf-select:focus { border-color: var(--blue); }
+    #hover-price {
+      position: absolute;
+      z-index: 20;
+      color: var(--ink);
+      font: 500 13px "IBM Plex Mono", monospace;
+      background: var(--card);
+      padding: 7px 10px;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.12s;
+      white-space: nowrap;
+      transform: translateX(-50%);
+      display: none;
+    }
+    @media (min-width: 769px) { #hover-price { display: block; } }
+    @media (max-width: 768px) {
+      body { overflow: auto; }
+      .wrap { height: auto; padding-bottom: 32px; }
+      #chart-container { height: 54vh; cursor: default; }
+      .wrap { height: auto; }
+    }
+  </style>
 </head>
 <body>
-<canvas id="static"></canvas>
+  <div class="noise"></div>
+  <div class="glow"></div>
 
-<div class="container">
-  <div class="typing" id="typing"></div>
-  
-  <div id="price-box">
-    <div id="coin-display">BTC</div>
-    <select id="coin-select"></select>
-    <span id="price-live">Loading...</span>
+  <header>
+    <div class="nav">
+      <a class="brand" href="https://fransoo.com">fransoo.com</a>
+      <div class="nav-meta">
+        <span class="live-dot" aria-hidden="true"></span>
+        <span>live board</span>
+        <a href="https://fransoo.com">back</a>
+      </div>
+    </div>
+  </header>
+
+  <div class="tape" id="tape" aria-label="Top movers">
+    <div class="tape-track" id="tapeTrack"></div>
   </div>
 
-  <div id="chart-container">
-    <select id="tf-select">
-      <option value="live">LIVE</option>
-      <option value="1h">1H</option>
-      <option value="1d">1D</option>
-      <option value="7d" selected>7D</option>
-      <option value="30d">30D</option>
-      <option value="ytd">YTD</option>
-      <option value="all">ALL</option>
-    </select>
-    <canvas id="c"></canvas>
-    <div id="hover-price"></div>
-  </div>
-  
-  <div id="change">Loading...</div>
-</div>
+  <main class="wrap">
+    <div class="intro" id="typing"></div>
 
-<script>
-// Static noise
-const s=document.getElementById('static'),ctx2=s.getContext('2d');
-s.width=innerWidth;s.height=innerHeight;
-window.addEventListener('resize',()=>{s.width=innerWidth;s.height=innerHeight});
-(function n(){const i=ctx2.createImageData(s.width,s.height),d=new Uint32Array(i.data.buffer);
-for(let j=0;j<d.length;j++)if(Math.random()<0.09)d[j]=0x33ffffff;ctx2.putImageData(i,0,0);requestAnimationFrame(n)})();
+    <div class="price-row">
+      <div class="price-main">
+        <div class="coin-wrap">
+          <span id="coin-display">BTC</span>
+          <select id="coin-select" aria-label="Select coin"></select>
+          <div class="coin-hint" id="coinHint">click for more tickers</div>
+        </div>
+        <span id="price-live">Loading…</span>
+      </div>
+      <div id="change">Loading…</div>
+    </div>
 
-// Typing animation
-const intro=`welcome to the fransoo.com crypto portal
+    <div id="chart-container">
+      <select id="tf-select" aria-label="Timeframe">
+        <option value="live">LIVE</option>
+        <option value="1h">1H</option>
+        <option value="1d">1D</option>
+        <option value="7d" selected>7D</option>
+        <option value="30d">30D</option>
+        <option value="ytd">YTD</option>
+        <option value="all">ALL</option>
+      </select>
+      <canvas id="c"></canvas>
+      <div id="hover-price"></div>
+    </div>
+  </main>
 
-live charts • top 30 coins • real-time`;
-const typing=document.getElementById('typing');
-let i=0;
-const ti=setInterval(()=>{if(i<intro.length){typing.innerHTML+=intro[i]==='\n'?'<br>':intro[i];i++}
-else{clearInterval(ti);typing.innerHTML+='<span class="cursor"></span>'}},45);
+  <script>
+    const intro = "live charts  ·  top 30 coins  ·  binance feed";
+    const typing = document.getElementById("typing");
+    let i = 0;
+    const ti = setInterval(() => {
+      if (i < intro.length) {
+        typing.textContent += intro[i];
+        i++;
+      } else {
+        clearInterval(ti);
+        typing.innerHTML += '<span class="cursor"></span>';
+      }
+    }, 28);
 
-// Elements
-const canvas=document.getElementById('c'),ctx=canvas.getContext('2d');
-const priceLive=document.getElementById('price-live');
-const changeEl=document.getElementById('change');
-const coinDisplay=document.getElementById('coin-display');
-const coinSel=document.getElementById('coin-select');
-const tfSel=document.getElementById('tf-select');
-const hoverPrice = document.getElementById('hover-price');
+    const canvas = document.getElementById("c");
+    const ctx = canvas.getContext("2d");
+    const priceLive = document.getElementById("price-live");
+    const changeEl = document.getElementById("change");
+    const coinDisplay = document.getElementById("coin-display");
+    const coinSel = document.getElementById("coin-select");
+    const tfSel = document.getElementById("tf-select");
+    const hoverPrice = document.getElementById("hover-price");
 
-let currentSymbol = 'BTCUSDT';
-let currentName = 'BTC';
-let lastPrice = 0;
-let chartData = {prices: [], times: []};
-let lastCandleTime = 0;
-let currentTf = '7d';
+    let currentSymbol = "BTCUSDT";
+    let currentName = "BTC";
+    let lastPrice = 0;
+    let chartData = { prices: [], times: [] };
+    let lastCandleTime = 0;
+    let currentTf = "7d";
 
-const top30 = [
-  {s:'BTCUSDT',n:'BTC'},{s:'ETHUSDT',n:'ETH'},{s:'BNBUSDT',n:'BNB'},{s:'SOLUSDT',n:'SOL'},
-  {s:'XRPUSDT',n:'XRP'},{s:'ADAUSDT',n:'ADA'},{s:'DOGEUSDT',n:'DOGE'},{s:'TRXUSDT',n:'TRX'},
-  {s:'AVAXUSDT',n:'AVAX'},{s:'SHIBUSDT',n:'SHIB'},{s:'LINKUSDT',n:'LINK'},{s:'DOTUSDT',n:'DOT'},
-  {s:'LTCUSDT',n:'LTC'},{s:'BCHUSDT',n:'BCH'},{s:'NEARUSDT',n:'NEAR'},{s:'HBARUSDT',n:'HBAR'},
-  {s:'MATICUSDT',n:'MATIC'},{s:'UNIUSDT',n:'UNI'},{s:'ICPUSDT',n:'ICP'},{s:'APTUSDT',n:'APT'},
-  {s:'CROUSDT',n:'CRO'},{s:'XLMUSDT',n:'XLM'},{s:'VETUSDT',n:'VET'},{s:'FILUSDT',n:'FIL'},
-  {s:'KASUSDT',n:'KAS'},{s:'ATOMUSDT',n:'ATOM'},{s:'STXUSDT',n:'STX'},{s:'ARBUSDT',n:'ARB'},
-  {s:'IMXUSDT',n:'IMX'},{s:'SUIUSDT',n:'SUI'}
-];
+    const top30 = [
+      {s:"BTCUSDT",n:"BTC"},{s:"ETHUSDT",n:"ETH"},{s:"BNBUSDT",n:"BNB"},{s:"SOLUSDT",n:"SOL"},
+      {s:"XRPUSDT",n:"XRP"},{s:"ADAUSDT",n:"ADA"},{s:"DOGEUSDT",n:"DOGE"},{s:"TRXUSDT",n:"TRX"},
+      {s:"AVAXUSDT",n:"AVAX"},{s:"SHIBUSDT",n:"SHIB"},{s:"LINKUSDT",n:"LINK"},{s:"DOTUSDT",n:"DOT"},
+      {s:"LTCUSDT",n:"LTC"},{s:"BCHUSDT",n:"BCH"},{s:"NEARUSDT",n:"NEAR"},{s:"HBARUSDT",n:"HBAR"},
+      {s:"MATICUSDT",n:"MATIC"},{s:"UNIUSDT",n:"UNI"},{s:"ICPUSDT",n:"ICP"},{s:"APTUSDT",n:"APT"},
+      {s:"CROUSDT",n:"CRO"},{s:"XLMUSDT",n:"XLM"},{s:"VETUSDT",n:"VET"},{s:"FILUSDT",n:"FIL"},
+      {s:"KASUSDT",n:"KAS"},{s:"ATOMUSDT",n:"ATOM"},{s:"STXUSDT",n:"STX"},{s:"ARBUSDT",n:"ARB"},
+      {s:"IMXUSDT",n:"IMX"},{s:"SUIUSDT",n:"SUI"}
+    ];
 
-function resize(){
-  canvas.width=canvas.offsetWidth*devicePixelRatio;
-  canvas.height=canvas.offsetHeight*devicePixelRatio;
-  ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
-}
-window.addEventListener('resize',resize);resize();
-
-async function safeFetch(url){
-  try{
-    const r = await fetch(url,{cache:"no-store"});
-    if(!r.ok) return null;
-    return await r.json();
-  }catch(e){return null}
-}
-
-async function updateDropdown(){
-  for(let coin of top30){
-    const data = await safeFetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${coin.s}`);
-    if(data){
-      const change = +data.priceChangePercent;
-      const opt = [...coinSel.options].find(o => o.value === coin.s);
-      if(opt) opt.textContent = `${coin.n} ${change>=0?'Up':'Down'} ${Math.abs(change).toFixed(2)}%`;
+    function css(name) {
+      return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
     }
-  }
-}
 
-async function updateLive(){
-  const data = await safeFetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${currentSymbol}`);
-  if(!data) return;
-
-  const price = +data.lastPrice;
-  const ch24 = +data.priceChangePercent;
-  const now = Date.now();
-
-  if(lastPrice !== 0 && price !== lastPrice){
-    priceLive.classList.add(price > lastPrice ? 'pulse-green' : 'pulse-red');
-    setTimeout(()=>priceLive.classList.remove('pulse-green','pulse-red'),500);
-  }
-  lastPrice = price;
-
-  priceLive.innerHTML = `$${price.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})} <span class="${ch24>=0?'up':'down'}">${ch24>=0?'+' : '-'} ${Math.abs(ch24).toFixed(2)}%</span>`;
-
-  if(currentTf === 'live'){
-    chartData.prices.push(price);
-    chartData.times.push(new Date(now));
-    if(chartData.prices.length > 400){chartData.prices.shift();chartData.times.shift();}
-  } else {
-    const intervalMs = {'1h':60*1000,'1d':86400000,'7d':3600000,'30d':86400000*30,'ytd':86400000*365,'all':604800000}[currentTf] || 3600000;
-    const candleTime = Math.floor(now / intervalMs) * intervalMs;
-    if(candleTime !== lastCandleTime){
-      lastCandleTime = candleTime;
-      chartData.prices.push(price);
-      chartData.times.push(new Date(candleTime));
-    } else if(chartData.prices.length > 0){
-      chartData.prices[chartData.prices.length-1] = price;
+    function resize() {
+      canvas.width = canvas.offsetWidth * devicePixelRatio;
+      canvas.height = canvas.offsetHeight * devicePixelRatio;
+      ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
     }
-  }
-  drawChart(chartData.prices, chartData.times, currentTf);
-}
+    window.addEventListener("resize", () => {
+      resize();
+      drawChart(chartData.prices, chartData.times, currentTf);
+    });
+    resize();
 
-async function loadChart(tf){
-  currentTf = tf;
-  if(tf==='live'){chartData={prices:[],times:[]};drawChart([],[],'live');return;}
-
-  let interval='1h', limit=168;
-  if(tf==='1h'){interval='1m';limit=60}
-  else if(tf==='1d'){interval='5m';limit=288}
-  else if(tf==='7d'){interval='1h';limit=168}
-  else if(tf==='30d'){interval='4h';limit=180}
-  else if(tf==='ytd'){interval='1d';limit=365}
-  else{interval='1w';limit=1000}
-
-  const data = await safeFetch(`https://api.binance.com/api/v3/klines?symbol=${currentSymbol}&interval=${interval}&limit=${limit}`);
-  if(!data || data.length<2) return;
-
-  chartData.prices = data.map(k=>+k[4]);
-  chartData.times = data.map(k=>new Date(k[0]));
-
-  const first=chartData.prices[0], last=chartData.prices[chartData.prices.length-1];
-  const change = ((last-first)/first)*100;
-  const tfName = tfSel.options[tfSel.selectedIndex].text;
-  changeEl.innerHTML = `<span class="${change>=0?'up':'down'}">${change>=0?'+' : '-'} ${Math.abs(change).toFixed(2)}%</span> (${tfName})`;
-
-  drawChart(chartData.prices, chartData.times, tf);
-}
-
-function drawChart(prices, times, tf){
-  resize();
-  const W=canvas.width/devicePixelRatio, H=canvas.height/devicePixelRatio;
-  ctx.clearRect(0,0,W,H);
-  if(prices.length < 2) return;
-
-  const padX=65, padY=45, chartWidth=W-padX-85, chartHeight=H-90;
-  const max=Math.max(...prices), min=Math.min(...prices), range=max-min||1;
-
-  // Area fill
-  ctx.fillStyle='rgba(0,191,255,0.12)';
-  ctx.beginPath();
-  prices.forEach((p,i)=>{const x=padX+i*(chartWidth/(prices.length-1));
-    const y=H-padY-((p-min)/range)*chartHeight;
-    i===0?ctx.moveTo(x,y):ctx.lineTo(x,y)});
-  ctx.lineTo(W-85,H-padY);ctx.lineTo(padX,H-padY);ctx.closePath();ctx.fill();
-
-  // Line
-  ctx.strokeStyle='#00bfff';ctx.lineWidth=2.5;ctx.beginPath();
-  prices.forEach((p,i)=>{const x=padX+i*(chartWidth/(prices.length-1));
-    const y=H-padY-((p-min)/range)*chartHeight;
-    i===0?ctx.moveTo(x,y):ctx.lineTo(x,y)});
-  ctx.stroke();
-
-  // End dot (only if not hovering)
-  if(!hoverPrice.style.opacity || hoverPrice.style.opacity === '0'){
-    const lastX = padX + (prices.length-1)*(chartWidth/(prices.length-1));
-    const lastY = H-padY-((prices[prices.length-1]-min)/range)*chartHeight;
-    ctx.fillStyle = '#00bfff';
-    ctx.beginPath(); ctx.arc(lastX, lastY, 8, 0, Math.PI*2); ctx.fill();
-    ctx.strokeStyle = '#00bfff'; ctx.lineWidth = 2.5; ctx.stroke();
-  }
-
-  // Grid + Price Axis + Time Labels
-  ctx.strokeStyle='#003340';
-  for(let i=0;i<=5;i++){
-    const y=padY+i*(chartHeight/5);
-    ctx.beginPath();ctx.moveTo(padX,y);ctx.lineTo(W-85,y);ctx.stroke();
-  }
-  ctx.fillStyle='#00bfff';ctx.font='14px monospace';ctx.textAlign='right';
-  for(let i=0;i<=5;i++){
-    const val=max-i*(range/5);
-    const y=padY+i*(chartHeight/5);
-    ctx.fillText('$' + val.toFixed(val>1000?0:2).replace(/\B(?=(\d{3})+(?!\d))/g, ','), W-15, y+5);
-  }
-  if(tf!=='live'){
-    ctx.textAlign='center';ctx.font='13px monospace';
-    const count=innerWidth<=768?4:7;
-    for(let i=0;i<=count;i++){
-      const idx=Math.round(i*(prices.length-1)/count);
-      const x=padX+idx*(chartWidth/(prices.length-1));
-      const d=times[idx];
-      let label=tf==='1h'?d.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}).replace(/:\d\d$/,''):
-                  tf==='1d'?d.getHours()+'h':
-                  tf==='7d'||tf==='30d'?d.toLocaleDateString('en-US',{month:'short',day:'numeric'}):
-                  tf==='ytd'?d.toLocaleDateString('en-US',{month:'short'}):d.getFullYear();
-      ctx.fillText(label,x,H-padY+25);
+    async function safeFetch(url) {
+      try {
+        const r = await fetch(url, { cache: "no-store" });
+        if (!r.ok) return null;
+        return await r.json();
+      } catch (e) { return null; }
     }
-  }
-  ctx.strokeStyle='#00bfff';ctx.lineWidth=1.8;
-  ctx.strokeRect(padX,padY,chartWidth,chartHeight);
-}
 
-// HOVER TRACKING — 100% PERFECT
-canvas.addEventListener('mousemove', e => {
-  if(innerWidth <= 768) return;
-  const rect = canvas.getBoundingClientRect();
-  const mouseX = e.clientX - rect.left;
-  const mouseY = e.clientY - rect.top;
+    function selectCoin(symbol) {
+      const coin = top30.find(c => c.s === symbol);
+      if (!coin) return;
+      currentSymbol = coin.s;
+      currentName = coin.n;
+      coinDisplay.textContent = coin.n;
+      lastPrice = 0;
+      chartData = { prices: [], times: [] };
+      lastCandleTime = 0;
+      const opt = [...coinSel.options].find(o => o.value === symbol);
+      if (opt) coinSel.value = symbol;
+      loadChart(tfSel.value);
+    }
 
-  const W = canvas.width/devicePixelRatio;
-  const H = canvas.height/devicePixelRatio;
-  const padX=65, chartWidth=W-padX-85, chartHeight=H-90;
+    async function updateDropdown() {
+      const rows = [];
+      for (const coin of top30) {
+        const data = await safeFetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${coin.s}`);
+        if (data) {
+          const change = +data.priceChangePercent;
+          rows.push({ ...coin, change });
+          const opt = [...coinSel.options].find(o => o.value === coin.s);
+          if (opt) opt.textContent = `${coin.n} ${change >= 0 ? "Up" : "Down"} ${Math.abs(change).toFixed(2)}%`;
+        }
+      }
+      renderTape(rows);
+    }
 
-  if(mouseX < padX || mouseX > W-85 || mouseY < 45 || mouseY > H-45){
-    hoverPrice.style.opacity = '0';
-    drawChart(chartData.prices, chartData.times, currentTf);
-    return;
-  }
+    function renderTape(rows) {
+      const track = document.getElementById("tapeTrack");
+      if (!track || !rows.length) return;
+      const top = [...rows].sort((a, b) => Math.abs(b.change) - Math.abs(a.change)).slice(0, 10);
+      const html = top.map(c => {
+        const up = c.change >= 0;
+        const arrow = up ? "▲" : "▼";
+        const sign = up ? "+" : "−";
+        return `<button class="tape-item ${up ? "up" : "down"}" data-symbol="${c.s}" type="button"><span class="sym">${c.n}</span><span>${arrow} ${sign}${Math.abs(c.change).toFixed(2)}%</span></button>`;
+      }).join("");
+      track.innerHTML = html + html;
+      track.querySelectorAll(".tape-item").forEach(btn => {
+        btn.addEventListener("click", () => selectCoin(btn.dataset.symbol));
+      });
+    }
 
-  const prices = chartData.prices;
-  if(prices.length < 2) return;
+    async function updateLive() {
+      const data = await safeFetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${currentSymbol}`);
+      if (!data) return;
+      const price = +data.lastPrice;
+      const ch24 = +data.priceChangePercent;
+      const now = Date.now();
+      if (lastPrice !== 0 && price !== lastPrice) {
+        priceLive.classList.add(price > lastPrice ? "pulse-green" : "pulse-red");
+        setTimeout(() => priceLive.classList.remove("pulse-green", "pulse-red"), 500);
+      }
+      lastPrice = price;
+      priceLive.innerHTML = `$${price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span class="pct ${ch24 >= 0 ? "up" : "down"}">${ch24 >= 0 ? "+" : "−"}${Math.abs(ch24).toFixed(2)}%</span>`;
+      if (currentTf === "live") {
+        chartData.prices.push(price);
+        chartData.times.push(new Date(now));
+        if (chartData.prices.length > 400) { chartData.prices.shift(); chartData.times.shift(); }
+      } else {
+        const intervalMs = { "1h": 60 * 1000, "1d": 86400000, "7d": 3600000, "30d": 86400000 * 30, "ytd": 86400000 * 365, "all": 604800000 }[currentTf] || 3600000;
+        const candleTime = Math.floor(now / intervalMs) * intervalMs;
+        if (candleTime !== lastCandleTime) {
+          lastCandleTime = candleTime;
+          chartData.prices.push(price);
+          chartData.times.push(new Date(candleTime));
+        } else if (chartData.prices.length > 0) {
+          chartData.prices[chartData.prices.length - 1] = price;
+        }
+      }
+      drawChart(chartData.prices, chartData.times, currentTf);
+    }
 
-  const max=Math.max(...prices), min=Math.min(...prices), range=max-min||1;
-  const fraction = (mouseX - padX) / chartWidth;
-  const index = Math.round(fraction * (prices.length - 1));
-  if(index < 0 || index >= prices.length) return;
+    async function loadChart(tf) {
+      currentTf = tf;
+      if (tf === "live") {
+        chartData = { prices: [], times: [] };
+        drawChart([], [], "live");
+        return;
+      }
+      let interval = "1h", limit = 168;
+      if (tf === "1h") { interval = "1m"; limit = 60; }
+      else if (tf === "1d") { interval = "5m"; limit = 288; }
+      else if (tf === "7d") { interval = "1h"; limit = 168; }
+      else if (tf === "30d") { interval = "4h"; limit = 180; }
+      else if (tf === "ytd") { interval = "1d"; limit = 365; }
+      else { interval = "1w"; limit = 1000; }
+      const data = await safeFetch(`https://api.binance.com/api/v3/klines?symbol=${currentSymbol}&interval=${interval}&limit=${limit}`);
+      if (!data || data.length < 2) return;
+      chartData.prices = data.map(k => +k[4]);
+      chartData.times = data.map(k => new Date(k[0]));
+      const first = chartData.prices[0], last = chartData.prices[chartData.prices.length - 1];
+      const change = ((last - first) / first) * 100;
+      const tfName = tfSel.options[tfSel.selectedIndex].text;
+      changeEl.innerHTML = `<span class="${change >= 0 ? "up" : "down"}">${change >= 0 ? "+" : "−"}${Math.abs(change).toFixed(2)}%</span> over ${tfName}`;
+      drawChart(chartData.prices, chartData.times, tf);
+    }
 
-  const price = prices[index];
-  const pointX = padX + index * (chartWidth / (prices.length - 1));
-  const pointY = H - 45 - ((price - min) / range) * chartHeight;
+    function drawChart(prices, times, tf) {
+      resize();
+      const W = canvas.width / devicePixelRatio, H = canvas.height / devicePixelRatio;
+      ctx.clearRect(0, 0, W, H);
+      if (prices.length < 2) return;
+      const padX = 28, padY = 52, right = 78, chartWidth = W - padX - right, chartHeight = H - 96;
+      const max = Math.max(...prices), min = Math.min(...prices), range = max - min || 1;
+      const blue = css("--blue") || "#2f7fff";
+      const muted = css("--dim") || "#6b7380";
+      const line = "rgba(255,255,255,0.06)";
 
-  drawChart(prices, chartData.times, currentTf);
+      ctx.fillStyle = "rgba(47,127,255,0.10)";
+      ctx.beginPath();
+      prices.forEach((p, idx) => {
+        const x = padX + idx * (chartWidth / (prices.length - 1));
+        const y = H - 44 - ((p - min) / range) * chartHeight;
+        idx === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      });
+      ctx.lineTo(W - right, H - 44);
+      ctx.lineTo(padX, H - 44);
+      ctx.closePath();
+      ctx.fill();
 
-  ctx.fillStyle = '#00ffff';
-  ctx.beginPath(); ctx.arc(pointX, pointY, 7, 0, Math.PI*2); ctx.fill();
-  ctx.strokeStyle = '#00bfff'; ctx.lineWidth = 3; ctx.stroke();
+      ctx.strokeStyle = blue;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      prices.forEach((p, idx) => {
+        const x = padX + idx * (chartWidth / (prices.length - 1));
+        const y = H - 44 - ((p - min) / range) * chartHeight;
+        idx === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      });
+      ctx.stroke();
 
-  hoverPrice.textContent = `$${price.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-  hoverPrice.style.left = pointX + 'px';
-  hoverPrice.style.top = (pointY - 34) + 'px';
-  hoverPrice.style.opacity = '1';
-});
+      if (!hoverPrice.style.opacity || hoverPrice.style.opacity === "0") {
+        const lastX = padX + (prices.length - 1) * (chartWidth / (prices.length - 1));
+        const lastY = H - 44 - ((prices[prices.length - 1] - min) / range) * chartHeight;
+        ctx.fillStyle = blue;
+        ctx.beginPath();
+        ctx.arc(lastX, lastY, 5, 0, Math.PI * 2);
+        ctx.fill();
+      }
 
-canvas.addEventListener('mouseout', () => {
-  hoverPrice.style.opacity = '0';
-  drawChart(chartData.prices, chartData.times, currentTf);
-});
+      ctx.strokeStyle = line;
+      ctx.lineWidth = 1;
+      for (let g = 0; g <= 5; g++) {
+        const y = padY + g * (chartHeight / 5);
+        ctx.beginPath();
+        ctx.moveTo(padX, y);
+        ctx.lineTo(W - right, y);
+        ctx.stroke();
+      }
 
-// Events
-coinSel.onchange = () => {
-  const opt = coinSel.options[coinSel.selectedIndex];
-  currentSymbol = opt.value;
-  currentName = opt.textContent.split(' ')[0];
-  coinDisplay.textContent = currentName;
-  lastPrice = 0; chartData = {prices: [], times: []}; lastCandleTime = 0;
-  loadChart(tfSel.value);
-};
-tfSel.onchange = () => loadChart(tfSel.value);
+      ctx.fillStyle = muted;
+      ctx.font = "12px IBM Plex Mono, monospace";
+      ctx.textAlign = "right";
+      for (let g = 0; g <= 5; g++) {
+        const val = max - g * (range / 5);
+        const y = padY + g * (chartHeight / 5);
+        ctx.fillText("$" + val.toFixed(val > 1000 ? 0 : 2).replace(/\B(?=(\d{3})+(?!\d))/g, ","), W - 14, y + 4);
+      }
 
-// Init
-async function init(){
-  coinSel.innerHTML = '';
-  top30.forEach(coin => {
-    const opt = document.createElement('option');
-    opt.value = coin.s;
-    opt.textContent = `${coin.n} Loading...`;
-    if(coin.s===currentSymbol) opt.selected = true;
-    coinSel.appendChild(opt);
-  });
-  updateDropdown();
-  loadChart('7d');
-}
-init();
+      if (tf !== "live") {
+        ctx.textAlign = "center";
+        const count = innerWidth <= 768 ? 4 : 7;
+        for (let t = 0; t <= count; t++) {
+          const idx = Math.round(t * (prices.length - 1) / count);
+          const x = padX + idx * (chartWidth / (prices.length - 1));
+          const d = times[idx];
+          let label = tf === "1h" ? d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }) :
+            tf === "1d" ? d.getHours() + "h" :
+            tf === "7d" || tf === "30d" ? d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) :
+            tf === "ytd" ? d.toLocaleDateString("en-US", { month: "short" }) : String(d.getFullYear());
+          ctx.fillText(label, x, H - 18);
+        }
+      }
+    }
 
-setInterval(updateLive, 3000);
-setInterval(updateDropdown, 60000);
-</script>
+    canvas.addEventListener("mousemove", e => {
+      if (innerWidth <= 768) return;
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      const W = canvas.width / devicePixelRatio;
+      const H = canvas.height / devicePixelRatio;
+      const padX = 28, right = 78, chartWidth = W - padX - right, chartHeight = H - 96;
+      if (mouseX < padX || mouseX > W - right || mouseY < 52 || mouseY > H - 44) {
+        hoverPrice.style.opacity = "0";
+        drawChart(chartData.prices, chartData.times, currentTf);
+        return;
+      }
+      const prices = chartData.prices;
+      if (prices.length < 2) return;
+      const max = Math.max(...prices), min = Math.min(...prices), range = max - min || 1;
+      const index = Math.round(((mouseX - padX) / chartWidth) * (prices.length - 1));
+      if (index < 0 || index >= prices.length) return;
+      const price = prices[index];
+      const pointX = padX + index * (chartWidth / (prices.length - 1));
+      const pointY = H - 44 - ((price - min) / range) * chartHeight;
+      drawChart(prices, chartData.times, currentTf);
+      ctx.fillStyle = "#9ec5ff";
+      ctx.beginPath();
+      ctx.arc(pointX, pointY, 6, 0, Math.PI * 2);
+      ctx.fill();
+      hoverPrice.textContent = "$" + price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      hoverPrice.style.left = pointX + "px";
+      hoverPrice.style.top = (pointY - 34) + "px";
+      hoverPrice.style.opacity = "1";
+    });
+    canvas.addEventListener("mouseout", () => {
+      hoverPrice.style.opacity = "0";
+      drawChart(chartData.prices, chartData.times, currentTf);
+    });
+
+    coinSel.onchange = () => selectCoin(coinSel.value);
+    tfSel.onchange = () => loadChart(tfSel.value);
+
+    async function init() {
+      coinSel.innerHTML = "";
+      top30.forEach(coin => {
+        const opt = document.createElement("option");
+        opt.value = coin.s;
+        opt.textContent = `${coin.n} Loading...`;
+        if (coin.s === currentSymbol) opt.selected = true;
+        coinSel.appendChild(opt);
+      });
+      updateDropdown();
+      loadChart("7d");
+    }
+    init();
+    setInterval(updateLive, 3000);
+    setInterval(updateDropdown, 60000);
+
+    setTimeout(() => {
+      const hint = document.getElementById("coinHint");
+      hint.classList.add("show");
+      setTimeout(() => hint.classList.remove("show"), 10000);
+    }, 30000);
+  </script>
 </body>
 </html>
