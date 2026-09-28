@@ -36,6 +36,8 @@
       min-height: 100vh;
       overflow: hidden;
       position: relative;
+      display: flex;
+      flex-direction: column;
     }
     a { color: inherit; text-decoration: none; }
     select, button { font-family: inherit; }
@@ -147,9 +149,11 @@
       position: relative;
       z-index: 2;
       max-width: 1080px;
+      width: 100%;
       margin: 0 auto;
-      padding: 22px 24px 24px;
-      height: calc(100vh - 110px);
+      padding: 22px 24px 16px;
+      flex: 1;
+      min-height: 0;
       display: flex;
       flex-direction: column;
       gap: 18px;
@@ -309,12 +313,82 @@
       display: none;
     }
     @media (min-width: 769px) { #hover-price { display: block; } }
+    footer {
+      position: relative;
+      z-index: 30;
+      border-top: 1px solid var(--line);
+      padding: 18px 24px 28px;
+      color: var(--dim);
+      font-size: 13px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+    .footer-sites {
+      position: relative;
+      display: flex;
+      justify-content: center;
+      margin-bottom: 14px;
+    }
+    .footer-brand {
+      border: 1px solid var(--line);
+      background: var(--card);
+      color: var(--ink);
+      font-weight: 600;
+      letter-spacing: -0.04em;
+      font-size: 20px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px 8px 16px;
+      border-radius: 999px;
+    }
+    .footer-brand:hover { border-color: var(--blue); }
+    .footer-brand .caret-pill {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 8px;
+    }
+    .site-menu {
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: 50%;
+      transform: translateX(-50%);
+      min-width: 240px;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 6px;
+      display: none;
+      z-index: 50;
+      box-shadow: 0 16px 40px rgba(0,0,0,0.35);
+      text-align: left;
+    }
+    .site-menu.open { display: block; }
+    .site-menu a {
+      display: block;
+      padding: 10px 12px;
+      border-radius: 10px;
+      font-weight: 600;
+      letter-spacing: -0.04em;
+      font-size: 15px;
+      color: var(--ink);
+    }
+    .site-menu a:hover { background: rgba(255,255,255,0.04); }
+    .btc { color: #f7931a; }
+
     @media (max-width: 768px) {
       body { overflow: auto; }
       .wrap {
         height: auto;
         min-height: 0;
-        padding: 14px 16px 28px;
+        padding: 14px 16px 16px;
         gap: 10px;
       }
       .intro { font-size: 10px; letter-spacing: 0.04em; }
@@ -356,7 +430,7 @@
         <div class="coin-wrap">
           <span id="coin-display">BTC</span>
           <select id="coin-select" aria-label="Select coin"></select>
-          <div class="coin-hint" id="coinHint">^ click for more tickers</div>
+          <div class="coin-hint" id="coinHint">click for more tickers</div>
         </div>
         <span id="price-live">Loading…</span>
       </div>
@@ -377,6 +451,20 @@
       <div id="hover-price"></div>
     </div>
   </main>
+
+  <footer>
+    <div class="footer-sites">
+      <button class="footer-brand" id="siteCaret" type="button" aria-expanded="false" aria-label="Open sites">
+        <span><span class="btc">bitcoin.</span>fransoo.com</span>
+        <span class="caret-pill">▾ sites</span>
+      </button>
+      <div class="site-menu" id="siteMenu">
+        <a href="https://fransoo.com">fransoo.com</a>
+        <a href="https://bitcoin.fransoo.com"><span class="btc">bitcoin.</span>fransoo.com</a>
+      </div>
+    </div>
+    <span>© Henry Fransoo • fransoo.com • Woeller23 Ventures</span>
+  </footer>
 
   <script>
     const intro = "live charts  ·  top 30 coins  ·  binance feed";
@@ -714,6 +802,20 @@
       hint.classList.add("show");
       setTimeout(() => hint.classList.remove("show"), 10000);
     }, 30000);
+
+    const siteCaret = document.getElementById("siteCaret");
+    const siteMenu = document.getElementById("siteMenu");
+    siteCaret.addEventListener("click", function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      const open = siteMenu.classList.toggle("open");
+      siteCaret.setAttribute("aria-expanded", open ? "true" : "false");
+    });
+    document.addEventListener("click", function() {
+      siteMenu.classList.remove("open");
+      siteCaret.setAttribute("aria-expanded", "false");
+    });
+    siteMenu.addEventListener("click", function(e) { e.stopPropagation(); });
   </script>
 </body>
 </html>
